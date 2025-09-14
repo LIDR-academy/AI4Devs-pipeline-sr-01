@@ -11,6 +11,22 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
+# Instalar Node.js si no está instalado
+if ! command -v node &> /dev/null; then
+    echo "📦 Instalando Node.js..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    nvm install 18
+    nvm use 18
+fi
+
+# Instalar PM2 si no está instalado
+if ! command -v pm2 &> /dev/null; then
+    echo "📦 Instalando PM2..."
+    npm install -g pm2
+fi
+
 # Instalar dependencias de producción
 echo "📦 Instalando dependencias de producción..."
 npm ci --only=production
