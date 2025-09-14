@@ -57,6 +57,15 @@ app.get('/', (req, res) => {
   res.send('Hola LTI!');
 });
 
+// Health check endpoint for monitoring and CI/CD
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
   res.type('text/plain');
