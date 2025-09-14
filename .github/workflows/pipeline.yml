@@ -157,7 +157,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             pm2 status
-            pm2 logs backend --lines 10
+            pm2 logs backend --lines 10 --nostream
 
       - name: Health check
         uses: appleboy/ssh-action@v1.0.3
