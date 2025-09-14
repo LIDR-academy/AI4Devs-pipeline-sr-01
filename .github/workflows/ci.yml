@@ -1,0 +1,119 @@
+---
+name: CI/CD Pipeline
+
+# Se ejecuta en pull requests
+"on":
+  pull_request:
+    types: [opened]
+
+jobs:
+  # Job de testing y build
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout del código
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup de Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      # Instalar dependencias
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./backend
+
+      # Ejecutar tests
+      - name: Run tests
+        run: npm test
+        working-directory: ./backend
+
+      # Generar build
+      - name: Build application
+        run: npm run build
+        working-directory: ./backend
+
+      # Subir build como artefacto
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build
+          path: backend/dist/
+          retention-days: 1
+
+  # Job de deploy a EC2
+  deploy:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout del código
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Descargar artefactos del build
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: ./dist
+
+      # Configurar SSH key para EC2
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.AWS_ACCESS_KEY }}
+
+      # Desplegar a EC2 via SCP (optimizado para t2.micro)
+      - name: Deploy to EC2
+        run: |
+          # Verificar espacio disponible en EC2 t2.micro
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_INSTANCE }} \
+            "df -h /tmp && echo 'Espacio disponible verificado'"
+
+          # Crear directorio temporal en EC2
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_INSTANCE }} \
+            "mkdir -p /tmp/backend-deploy"
+
+          # Copiar archivos del build (optimizado para t2.micro)
+          scp -o StrictHostKeyChecking=no -r ./dist/* \
+            ubuntu@${{ secrets.EC2_INSTANCE }}:/tmp/backend-deploy/
+
+          # Copiar package.json y package-lock.json
+          scp -o StrictHostKeyChecking=no backend/package.json \
+            ubuntu@${{ secrets.EC2_INSTANCE }}:/tmp/backend-deploy/
+          scp -o StrictHostKeyChecking=no backend/package-lock.json \
+            ubuntu@${{ secrets.EC2_INSTANCE }}:/tmp/backend-deploy/
+
+          # Backup del directorio actual (por seguridad)
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_INSTANCE }} \
+            "sudo cp -r /opt/backend /opt/backend-backup-\$(date +%Y%m%d-%H%M%S) || true"
+
+          # Mover archivos a directorio de producción
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_INSTANCE }} \
+            "sudo cp -r /tmp/backend-deploy/* /opt/backend/"
+
+          # Instalar dependencias de producción (con timeout para t2.micro)
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_INSTANCE }} \
+            "cd /opt/backend && timeout 300 npm ci --production --no-audit --no-fund"
+
+          # Verificar que el servicio existe antes de reiniciar
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_INSTANCE }} \
+            "sudo systemctl is-enabled backend.service && \
+             sudo systemctl restart backend.service || \
+             echo 'Servicio no encontrado, iniciando manualmente'"
+
+          # Verificar estado del servicio
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_INSTANCE }} \
+            "sudo systemctl status backend.service --no-pager || \
+             echo 'Verificación de servicio completada'"
+
+          # Limpiar archivos temporales para liberar espacio
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_INSTANCE }} \
+            "rm -rf /tmp/backend-deploy && echo 'Limpieza completada'"
