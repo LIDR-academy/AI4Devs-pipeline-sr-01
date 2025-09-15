@@ -48,28 +48,13 @@ jobs:
           # Crear archivo de clave privada
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
-
-          # 1. Crear un directorio apropiado para el backend en el servidor
-          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST "mkdir -p ~/app/backend"
-
-          # 2. Usar rsync para transferir los archivos de build (desde backend/dist) y de dependencias
-          rsync -avz -e "ssh -o StrictHostKeyChecking=no -i private_key.pem" --delete \
-            ./backend/dist/ \
-            ./backend/package.json \
-            ./backend/package-lock.json \
-            $USER@$HOST:~/app/backend/
-
-          # 3. Conectarse al servidor para instalar dependencias y reiniciar la aplicación
-          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
-          # Cargar el entorno de NVM para poder usar npm y pm2
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           
-          # Moverse al directorio de la app, instalar dependencias y reiniciar
-          cd ~/app/backend
-          npm install --omit=dev
-          pm2 reload backend --silent
-          EOF
-
+          # Crear directorio de despliegue si no existe
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST 'mkdir -p react-app'
+          
+          # Transferir archivos construidos
+          scp -o StrictHostKeyChecking=no -i private_key.pem -r ./backend/dist/  $USER@$HOST:react-app
+          
+          # Limpiar archivo de clave
           rm -f private_key.pem
 
