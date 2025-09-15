@@ -48,12 +48,32 @@ jobs:
         chmod 600 private_key.pem
         
         # Crear directorio de despliegue si no existe
-        ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST 'mkdir -p react-app'
+        #ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST 'mkdir -p react-app'
         
         # Transferir archivos construidos
-        scp -o StrictHostKeyChecking=no -i private_key.pem -r dist/* $USER@$HOST:react-app
+        #scp -o StrictHostKeyChecking=no -i private_key.pem -r dist/* $USER@$HOST:react-app
         
         # Limpiar archivo de clave
-        rm -f private_key.pem
+        #rm -f private_key.pem
 
+        # Creamos el directorio de despliegue en el servidor si no existe
+        ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST "mkdir -p ~/app/backend"
+
+        # Usamos rsync para una transferencia de archivos eficiente.
+        # Sincronizamos la carpeta 'dist' del backend y los archivos de dependencias.
+        rsync -avz -e "ssh -o StrictHostKeyChecking=no -i private_key.pem" --delete \
+          ./backend/dist/ \
+          ./backend/package.json \
+          ./backend/package-lock.json \
+          $USER@$HOST:~/app/backend/
+
+        # Nos conectamos a la instancia para instalar dependencias y reiniciar la aplicación
+        ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
+        cd ~/app/backend
+        npm install --omit=dev
+        # Asumimos que usas pm2 para gestionar tu aplicación.
+        # 'pm2 reload <app_name>' reinicia la app sin downtime.
+        # Cambia 'backend' por el nombre de tu proceso en pm2.
+        pm2 reload backend --silent
+        EOF
 
