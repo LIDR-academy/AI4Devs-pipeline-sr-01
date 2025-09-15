@@ -5,3 +5,7 @@ Eres un Devops engineer y se te ha solicitado crear un pipeline usando github ac
 # prompt 2
 
 revisa que todo este correcto en el archivo ci.yml 
+
+# prompt 3
+
+revisa el archivo ci.yml. deseo que tras el trigger "push a una rama con un pull request abierto" pase tests de backend, genere un bulid del backend i despliegue el backend en un EC2.
