@@ -13,56 +13,142 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout del código
+      # 1) Checkout
       - name: Checkout code
-        uses: actions/checkout@v3
+      uses: actions/checkout@v3
 
-      # 2) Configurar Node.js
+      # 2) Node para build
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3) Backend - instalar dependencias, test y build
+      # 3) Backend: deps + tests + build
       - name: Install backend dependencies
         working-directory: backend
-        run: npm install
+        run: npm ci
 
       - name: Run backend tests
         working-directory: backend
-        run: npm test
+        run: npm test --silent
 
       - name: Build backend
         working-directory: backend
         run: npm run build
 
-      # 4) Frontend - instalar dependencias y build
+      # 4) Frontend: deps + build
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci
 
       - name: Build frontend
         working-directory: frontend
         run: npm run build
 
-      # 5) Configurar credenciales AWS
+      # 5) Configura credenciales AWS (usamos tus 2 secretos y la región del README)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-region: eu-north-1   # Estocolmo
+          aws-region: eu-north-1
 
-      # 6) Deploy en EC2 usando SSM (sin PEM)
-      - name: Deploy to EC2 with SSM
+      # 6) Resolver InstanceId a partir de EC2_INSTANCE (IP, DNS o Id)
+      - name: Resolve EC2 Instance ID
+        id: ec2
+        shell: bash
         run: |
-          aws ssm send-command \
-            --targets "Key=instanceIds,Values=${{ secrets.EC2_INSTANCE }}" \
+          set -euo pipefail
+          TARGET="${{ secrets.EC2_INSTANCE }}"
+          echo "EC2_INSTANCE recibido: $TARGET"
+
+          # Intento 1: es una IP pública
+          IID=$(aws ec2 describe-instances \
+            --filters "Name=ip-address,Values=$TARGET" \
+            --query "Reservations[*].Instances[*].InstanceId" \
+            --output text 2>/dev/null || true)
+
+          # Intento 2: es un DNS público
+          if [ -z "$IID" ]; then
+            IID=$(aws ec2 describe-instances \
+              --filters "Name=network-interface.addresses.association.public-dns-name,Values=$TARGET" \
+              --query "Reservations[*].Instances[*].InstanceId" \
+              --output text 2>/dev/null || true)
+          fi
+
+          # Intento 3: quizá ya es un InstanceId
+          if [ -z "$IID" ]; then
+            if [[ "$TARGET" =~ ^i-[a-zA-Z0-9]+$ ]]; then
+              IID="$TARGET"
+            fi
+          fi
+
+          if [ -z "$IID" ]; then
+            echo "No se pudo resolver el InstanceId a partir de EC2_INSTANCE=$TARGET" >&2
+            exit 1
+          fi
+
+          echo "InstanceId: $IID"
+          echo "instance_id=$IID" >> "$GITHUB_OUTPUT"
+
+      # 7) Despliegue vía SSM (sin PEM): clona/actualiza repo y arranca backend/frontend
+      - name: Deploy to EC2 via SSM
+        shell: bash
+        run: |
+          set -euo pipefail
+          IID="${{ steps.ec2.outputs.instance_id }}"
+
+          # Script remoto: instala lo necesario y arranca
+          read -r -d '' SCRIPT <<'EOS'
+          set -e
+
+          # Herramientas base
+          sudo yum -y install git
+
+          # Node 20
+          curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+          sudo yum -y install nodejs
+
+          # Carpeta de trabajo
+          cd ~
+          if [ ! -d "AI4Devs-week12-pipeline-sr-01" ]; then
+            git clone https://github.com/adriansendin/AI4Devs-week12-pipeline-sr-01.git
+          fi
+
+          cd AI4Devs-week12-pipeline-sr-01
+          git fetch origin pipeline-ASM
+          git checkout pipeline-ASM
+          git pull --ff-only origin pipeline-ASM
+
+          # Backend
+          cd backend
+          npm ci
+          npm run build
+          # mata proceso en 3010 si lo hubiera
+          (pkill -f "node dist/index.js" || true)
+          nohup npm start > ~/backend.log 2>&1 &
+
+          # Frontend
+          cd ../frontend
+          npm ci
+          npm run build
+          # instala serve local (sin sudo, evita global)
+          npx --yes serve@14 -s build -l 3000 > ~/frontend.log 2>&1 &
+          EOS
+
+          # Enviamos el comando vía SSM
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$IID" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy LTI app" \
-            --parameters 'commands=[
-              "cd ~/AI4Devs-week12-pipeline-sr-01 || git clone https://github.com/adriansendin/AI4Devs-week12-pipeline-sr-01.git",
-              "cd AI4Devs-week12-pipeline-sr-01 && git pull origin pipeline-ASM",
-              "cd backend && npm install && npm run build && nohup npm start > backend.log 2>&1 &",
-              "cd ../frontend && npm install -g serve && nohup serve -s build -l 3000 > frontend.log 2>&1 &"
-            ]'
+            --parameters commands="$SCRIPT" \
+            --comment "Deploy by GitHub Actions" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "CommandId: $CMD_ID"
+
+          # Espera a que termine
+          aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$IID"
+
+          # Muestra estado final
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$IID" --query "Status,StatusDetails"
