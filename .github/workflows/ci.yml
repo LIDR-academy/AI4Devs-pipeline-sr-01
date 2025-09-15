@@ -53,7 +53,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST 'mkdir -p react-app'
           
           # Transferir archivos construidos
-          scp -o StrictHostKeyChecking=no -i private_key.pem -r build/* $USER@$HOST:react-app
+          scp -o StrictHostKeyChecking=no -i private_key.pem -r src/* $USER@$HOST:react-app
           
           # Limpiar archivo de clave
           rm -f private_key.pem
