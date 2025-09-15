@@ -13,138 +13,61 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout
+      # 1) Checkout del código
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2) Node para build
+      # 2) Configurar Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3) Backend: deps + tests + build
+      # 3) Backend - instalar dependencias, test y build
       - name: Install backend dependencies
         working-directory: backend
-        run: npm ci
+        run: npm install
 
       - name: Run backend tests
         working-directory: backend
-        run: npm test --silent
+        run: npm test
 
       - name: Build backend
         working-directory: backend
         run: npm run build
 
-      # 4) Frontend: deps + build
+      # 4) Frontend - instalar dependencias y build
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm install
 
       - name: Build frontend
         working-directory: frontend
         run: npm run build
 
-      # 5) Configura credenciales AWS (usamos tus 2 secretos y la región de tu instancia)
+      # 5) Configurar credenciales AWS
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-region: eu-north-1
+          aws-region: eu-north-1   # Estocolmo
 
-      # 6) Resolver InstanceId a partir de EC2_INSTANCE (IP, DNS o Id)
-      - name: Resolve EC2 Instance ID
-        id: ec2
-        shell: bash
+      # 6) Obtener Instance ID de la IP pública
+      - name: Get EC2 Instance ID
+        id: get_instance_id
         run: |
-          set -euo pipefail
-          TARGET="${{ secrets.EC2_INSTANCE }}"
-          echo "EC2_INSTANCE recibido: $TARGET"
-
-          IID=$(aws ec2 describe-instances \
-            --filters "Name=ip-address,Values=$TARGET" \
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=ip-address,Values=${{ secrets.EC2_INSTANCE }}" \
             --query "Reservations[].Instances[].InstanceId" \
-            --output text 2>/dev/null || true)
-
-          if [ -z "$IID" ]; then
-            IID=$(aws ec2 describe-instances \
-              --filters "Name=network-interface.addresses.association.public-dns-name,Values=$TARGET" \
-              --query "Reservations[].Instances[].InstanceId" \
-              --output text 2>/dev/null || true)
-          fi
-
-          if [ -z "$IID" ]; then
-            if [[ "$TARGET" =~ ^i-[A-Za-z0-9]+$ ]]; then
-              IID="$TARGET"
-            fi
-          fi
-
-          if [ -z "$IID" ]; then
-            echo "No se pudo resolver el InstanceId a partir de EC2_INSTANCE=$TARGET" >&2
-            exit 1
-          fi
-
-          echo "InstanceId: $IID"
-          echo "instance_id=$IID" >> "$GITHUB_OUTPUT"
-
-      # 7) Despliegue vía SSM (sin PEM)
-      - name: Deploy to EC2 via SSM
-        shell: bash
-        run: |
-          set -euo pipefail
-          IID="${{ steps.ec2.outputs.instance_id }}"
-
-          # Construimos el script remoto
-          cat > deploy.sh <<'EOS'
-          set -e
-
-          # Herramientas base
-          sudo yum -y install git
-
-          # Node 20 (por si la AMI no lo trae)
-          curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-          sudo yum -y install nodejs
-
-          # Código
-          cd ~
-          if [ ! -d "AI4Devs-week12-pipeline-sr-01" ]; then
-            git clone https://github.com/adriansendin/AI4Devs-week12-pipeline-sr-01.git
-          fi
-
-          cd AI4Devs-week12-pipeline-sr-01
-          git fetch origin pipeline-ASM
-          git checkout pipeline-ASM
-          git pull --ff-only origin pipeline-ASM
-
-          # Backend
-          cd backend
-          npm ci
-          npm run build
-          # matar backend previo si estuviera
-          (pkill -f "node dist/index.js" || true)
-          nohup npm start > ~/backend.log 2>&1 &
-
-          # Frontend
-          cd ../frontend
-          npm ci
-          npm run build
-          # servir estático con serve (local, sin sudo)
-          npx --yes serve@14 -s build -l 3000 > ~/frontend.log 2>&1 &
-          EOS
-
-          # Codificamos el script y lo enviamos como un único comando a SSM
-          BASE64=$(base64 -w 0 deploy.sh)
-          CMD='bash -lc "echo '"$BASE64"' | base64 -d > /home/ec2-user/deploy.sh && chmod +x /home/ec2-user/deploy.sh && /home/ec2-user/deploy.sh"'
-
-          CMD_ID=$(aws ssm send-command \
-            --instance-ids "$IID" \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands="$CMD" \
-            --comment "Deploy by GitHub Actions" \
-            --query "Command.CommandId" \
             --output text)
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
 
-          echo "CommandId: $CMD_ID"
-          aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$IID"
-          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$IID" --query "Status,StatusDetails"
+      # 7) Deploy en EC2 usando SSM (sin PEM)
+      - name: Deploy to EC2 via SSM
+        run: |
+          aws ssm send-command \
+            --targets "Key=instanceIds,Values=${{ steps.get_instance_id.outputs.instance_id }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy backend and frontend" \
+            --parameters 'commands=["bash -lc \"echo c2V0IC1lCgojIEhlcnJhbWllbnRhcyBiYXNlCnN1ZG8geXVtIC15IGluc3RhbGwgZ2l0CgojIE5vZGUgMjAgKHBvciBzaSBsYSBBTUkgbm8gbG8gdHJhZSkKY3VybCAtZnNTTCBodHRwczovL3JwbS5ub2Rlc291cmNlLmNvbS9zZXR1cF8yMC54IHwgc3VkbyBiYXNoIC0Kc3VkbyB5dW0gLXkgaW5zdGFsbCBub2RlanMKCiMgQ8OzZGlnbwpjZCB+CmlmIFsgISAtZCAiQUk0RGV2cy13ZWVrMTItcGlwZWxpbmUtc3ItMDEiIF07IHRoZW4KICBnaXQgY2xvbmUgaHR0cHM6Ly9naXRodWIuY29tL2FkcmlhbnNlbmRpbi9BSTREZXZzLXdlZWsxMi1waXBlbGluZS1zci0wMS5naXQKZmkKCmNkIEFJNERldnMtd2VlazEyLXBpcGVsaW5lLXNyLTAxCmdpdCBmZXRjaCBvcmlnaW4gcGlwZWxpbmUtQVNNCmdpdCBjaGVja291dCBwaXBlbGluZS1BU00KZ2l0IHB1bGwgLS1mZi1vbmx5IG9yaWdpbiBwaXBlbGluZS1BU00KCiMgQmFja2VuZApjZCBiYWNrZW5kCm5wbSBjaQpucG0gcnVuIGJ1aWxkCiMgbWF0YXIgYmFja2VuZCBwcmV2aW8gc2kgZXN0dXZpZXJhCihwa2lsbCAtZiAibm9kZSBkaXN0L2luZGV4LmpzIiB8fCB0cnVlKQpub2h1cCBucG0gc3RhcnQgPiB+L2JhY2tlbmQubG9nIDI+JjEgJgoKIyBGcm9udGVuZApjZCAuLi9mcm9udGVuZApucG0gY2kKbnBtIHJ1biBidWlsZAojIHNlcnZpciBlc3TDoXRpY28gY29uIHNlcnZlIChsb2NhbCwgc2luIHN1ZG8pCm5weCAtLXllcyBzZXJ2ZUAxNCAtcyBidWlsZCAtbCAzMDAwID4gfi9mcm9udGVuZC5sb2cgMj4mMSAmCg==\" | base64 -d > /home/ec2-user/deploy.sh && chmod +x /home/ec2-user/deploy.sh && /home/ec2-user/deploy.sh"]'
