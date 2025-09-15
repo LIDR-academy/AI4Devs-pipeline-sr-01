@@ -15,7 +15,7 @@ jobs:
     steps:
       # 1) Checkout
       - name: Checkout code
-      uses: actions/checkout@v3
+        uses: actions/checkout@v3
 
       # 2) Node para build
       - name: Set up Node.js
@@ -45,7 +45,7 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      # 5) Configura credenciales AWS (usamos tus 2 secretos y la región del README)
+      # 5) Configura credenciales AWS (usamos tus 2 secretos y la región de tu instancia)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -62,23 +62,20 @@ jobs:
           TARGET="${{ secrets.EC2_INSTANCE }}"
           echo "EC2_INSTANCE recibido: $TARGET"
 
-          # Intento 1: es una IP pública
           IID=$(aws ec2 describe-instances \
             --filters "Name=ip-address,Values=$TARGET" \
-            --query "Reservations[*].Instances[*].InstanceId" \
+            --query "Reservations[].Instances[].InstanceId" \
             --output text 2>/dev/null || true)
 
-          # Intento 2: es un DNS público
           if [ -z "$IID" ]; then
             IID=$(aws ec2 describe-instances \
               --filters "Name=network-interface.addresses.association.public-dns-name,Values=$TARGET" \
-              --query "Reservations[*].Instances[*].InstanceId" \
+              --query "Reservations[].Instances[].InstanceId" \
               --output text 2>/dev/null || true)
           fi
 
-          # Intento 3: quizá ya es un InstanceId
           if [ -z "$IID" ]; then
-            if [[ "$TARGET" =~ ^i-[a-zA-Z0-9]+$ ]]; then
+            if [[ "$TARGET" =~ ^i-[A-Za-z0-9]+$ ]]; then
               IID="$TARGET"
             fi
           fi
@@ -91,25 +88,25 @@ jobs:
           echo "InstanceId: $IID"
           echo "instance_id=$IID" >> "$GITHUB_OUTPUT"
 
-      # 7) Despliegue vía SSM (sin PEM): clona/actualiza repo y arranca backend/frontend
+      # 7) Despliegue vía SSM (sin PEM)
       - name: Deploy to EC2 via SSM
         shell: bash
         run: |
           set -euo pipefail
           IID="${{ steps.ec2.outputs.instance_id }}"
 
-          # Script remoto: instala lo necesario y arranca
-          read -r -d '' SCRIPT <<'EOS'
+          # Construimos el script remoto
+          cat > deploy.sh <<'EOS'
           set -e
 
           # Herramientas base
           sudo yum -y install git
 
-          # Node 20
+          # Node 20 (por si la AMI no lo trae)
           curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
           sudo yum -y install nodejs
 
-          # Carpeta de trabajo
+          # Código
           cd ~
           if [ ! -d "AI4Devs-week12-pipeline-sr-01" ]; then
             git clone https://github.com/adriansendin/AI4Devs-week12-pipeline-sr-01.git
@@ -124,7 +121,7 @@ jobs:
           cd backend
           npm ci
           npm run build
-          # mata proceso en 3010 si lo hubiera
+          # matar backend previo si estuviera
           (pkill -f "node dist/index.js" || true)
           nohup npm start > ~/backend.log 2>&1 &
 
@@ -132,23 +129,22 @@ jobs:
           cd ../frontend
           npm ci
           npm run build
-          # instala serve local (sin sudo, evita global)
+          # servir estático con serve (local, sin sudo)
           npx --yes serve@14 -s build -l 3000 > ~/frontend.log 2>&1 &
           EOS
 
-          # Enviamos el comando vía SSM
+          # Codificamos el script y lo enviamos como un único comando a SSM
+          BASE64=$(base64 -w 0 deploy.sh)
+          CMD='bash -lc "echo '"$BASE64"' | base64 -d > /home/ec2-user/deploy.sh && chmod +x /home/ec2-user/deploy.sh && /home/ec2-user/deploy.sh"'
+
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$IID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands="$SCRIPT" \
+            --parameters commands="$CMD" \
             --comment "Deploy by GitHub Actions" \
             --query "Command.CommandId" \
             --output text)
 
           echo "CommandId: $CMD_ID"
-
-          # Espera a que termine
           aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$IID"
-
-          # Muestra estado final
           aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$IID" --query "Status,StatusDetails"
