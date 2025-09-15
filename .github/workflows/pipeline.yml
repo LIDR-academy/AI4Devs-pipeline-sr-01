@@ -1,55 +1,70 @@
-      - name: Deploy to EC2 via SSM
+name: LTI Pipeline
+
+on:
+  push:
+    branches: [pipeline-ASM]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Test backend
+        working-directory: backend
+        run: npm test --silent
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - name: Get EC2 Instance ID (from public IP or keep if Id)
+        id: get_instance_id
         shell: bash
         run: |
           set -euo pipefail
-          IID="${{ steps.get_instance_id.outputs.instance_id }}"
-
-          # Crear script de despliegue
-          cat > deploy.sh <<'EOS'
-          set -e
-          sudo yum -y install git
-          curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-          sudo yum -y install nodejs
-
-          cd ~
-          if [ ! -d "AI4Devs-week12-pipeline-sr-01" ]; then
-            git clone https://github.com/adriansendin/AI4Devs-week12-pipeline-sr-01.git
+          TARGET="${{ secrets.EC2_INSTANCE }}"
+          if [[ "$TARGET" =~ ^i-[A-Za-z0-9]+$ ]]; then
+            echo "instance_id=$TARGET" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-
-          cd AI4Devs-week12-pipeline-sr-01
-          git fetch origin pipeline-ASM
-          git checkout pipeline-ASM
-          git pull --ff-only origin pipeline-ASM
-
-          cd backend
-          npm ci
-          npm run build
-          (pkill -f "node dist/index.js" || true)
-          nohup npm start > ~/backend.log 2>&1 &
-
-          cd ../frontend
-          npm ci
-          npm run build
-          nohup npx --yes serve@14 -s build -l 3000 > ~/frontend.log 2>&1 &
-          EOS
-
-          # Codificar en base64 compatible
-          B64=$(base64 deploy.sh | tr -d '\n')
-          cat > params.json <<EOF
-          {
-            "commands": [
-              "echo $B64 | base64 -d > /tmp/deploy.sh && chmod +x /tmp/deploy.sh && bash /tmp/deploy.sh"
-            ]
-          }
-          EOF
-
-          CMD_ID=$(aws ssm send-command \
-            --instance-ids "$IID" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploy by GitHub Actions" \
-            --parameters file://params.json \
-            --query "Command.CommandId" \
+          IID=$(aws ec2 describe-instances \
+            --filters "Name=ip-address,Values=$TARGET" \
+            --query "Reservations[].Instances[].InstanceId" \
             --output text)
+          if [ -z "$IID" ] || [ "$IID" = "None" ]; then
+            echo "No se pudo resolver InstanceId desde $TARGET" >&2
+            exit 1
+          fi
+          echo "instance_id=$IID" >> "$GITHUB_OUTPUT"
 
-          aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$IID"
-          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$IID" --query "Status,StatusDetails"
+      - name: Deploy to EC2 via SSM
+        shell: bash
+        run: |
