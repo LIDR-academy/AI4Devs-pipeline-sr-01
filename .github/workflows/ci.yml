@@ -50,16 +50,18 @@ jobs:
           # Crear directorio de despliegue si no existe
           ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST "mkdir -p ~/app/backend"
           
-          # Transferir artefactos construidos + package files (imprescindible para instalar deps)
+          # Transferir artefactos construidos + package files + schema de Prisma (imprescindible)
           scp -o StrictHostKeyChecking=no -i private_key.pem -r \
             ./backend/dist \
             ./backend/package.json \
             ./backend/package-lock.json \
+            ./backend/prisma \
             $USER@$HOST:~/app/backend/
           
           # Preparar entorno e iniciar/reiniciar con PM2 en la EC2
           ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST 'bash -lc "
             set -e
+
             # Instalar Node.js y npm si no existen (Amazon Linux 2023)
             if ! command -v node >/dev/null 2>&1; then
               sudo dnf -y install nodejs20 nodejs20-npm || sudo dnf -y install nodejs
@@ -73,7 +75,7 @@ jobs:
               sudo env PATH=\$PATH:/usr/bin pm2 startup systemd -u '"$USER"' --hp /home/'"$USER"'
             fi
 
-            # Instalar dependencias de producción y (re)arrancar
+            # Instalar dependencias de producción
             cd ~/app/backend
             if [ -f package-lock.json ]; then
               npm ci --omit=dev || npm install --omit=dev
@@ -81,6 +83,15 @@ jobs:
               npm install --omit=dev
             fi
 
+            # Generar Prisma Client (evita el error '@prisma/client did not initialize yet')
+            if [ -f ./prisma/schema.prisma ]; then
+              npm i prisma --no-save
+              npx prisma generate --schema=./prisma/schema.prisma
+              # Si usas migraciones en despliegue, descomenta:
+              # npx prisma migrate deploy
+            fi
+
+            # Iniciar o recargar con PM2
             if pm2 describe backend >/dev/null 2>&1; then
               pm2 reload backend --update-env
             else
@@ -96,5 +107,3 @@ jobs:
           
           # Limpiar archivo de clave
           rm -f private_key.pem
-
-
