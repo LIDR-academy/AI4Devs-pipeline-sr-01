@@ -3,85 +3,107 @@ name: Deploy Backend App to EC2
 on:
   pull_request:
     branches: [ main ]
-    types: [opened, synchronize]
+    types: [ opened, synchronize ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18.x'
+      - name: Setup Node.js (for build & tests in CI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
-    - name: Install dependencies
-      run: npm install
-      working-directory: ./backend
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
 
-    - name: Run tests
-      run: npm test -- --passWithNoTests
-      working-directory: ./backend
+      - name: Run tests
+        working-directory: ./backend
+        run: npm test -- --passWithNoTests
 
-    - name: Build application
-      run: npm run build
-      working-directory: ./backend
-      
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
-        aws-region: 'eu-north-1'
+      - name: Build application
+        working-directory: ./backend
+        run: npm run build
 
-    - name: Deploy to EC2
-      env:
-        PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        HOST: ${{ secrets.EC2_INSTANCE }}
-        USER: ${{ secrets.EC2_USER }}
-      run: |
-        # Crear archivo de clave privada
-        echo "$PRIVATE_KEY" > private_key.pem
-        chmod 600 private_key.pem
-        
-        # Crear directorio de despliegue si no existe
-        #ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST 'mkdir -p react-app'
-        
-        # Transferir archivos construidos
-        #scp -o StrictHostKeyChecking=no -i private_key.pem -r dist/* $USER@$HOST:react-app
-        
-        # Limpiar archivo de clave
-        #rm -f private_key.pem
+      - name: Add SSH key & known_hosts
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.EC2_INSTANCE }}
+        run: |
+          install -m 600 -D <<<"$PRIVATE_KEY" ~/.ssh/id_ed25519
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
 
-        # Creamos el directorio de despliegue en el servidor si no existe
-        ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST "mkdir -p ~/app/backend"
+      - name: Rsync backend to EC2
+        env:
+          HOST: ${{ secrets.EC2_INSTANCE }}
+          USER: ${{ secrets.EC2_USER }}
+        run: |
+          # Sube solo lo necesario (sin node_modules, tests, etc.)
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" \
+            --exclude ".git" \
+            --exclude "node_modules" \
+            --exclude "coverage" \
+            --exclude ".env" \
+            ./backend/ \
+            "$USER@$HOST:/home/$USER/app/backend/"
 
-        # Usamos rsync para una transferencia de archivos eficiente.
-        # Sincronizamos la carpeta 'dist' del backend y los archivos de dependencias.
-        rsync -avz -e "ssh -o StrictHostKeyChecking=no -i private_key.pem" --delete \
-          ./backend/dist/ \
-          ./backend/package.json \
-          ./backend/package-lock.json \
-          $USER@$HOST:~/app/backend/
+      - name: Remote setup & restart (Node.js + PM2 + start/restart)
+        env:
+          HOST: ${{ secrets.EC2_INSTANCE }}
+          USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "$USER@$HOST" 'bash -lc "
+            set -e
 
-        # Nos conectamos a la instancia para instalar dependencias y reiniciar la aplicación
-        ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
-        # Carga NVM (Node Version Manager) para tener acceso a node, npm y pm2
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            # === Node.js en Amazon Linux 2023 ===
+            sudo dnf -y module enable nodejs:20 || true
+            sudo dnf -y install nodejs
 
-        # Navega al directorio de la aplicación
-        cd ~/app/backend
+            node -v
+            npm -v
 
-        # Instala dependencias de producción
-        npm install --omit=dev
+            # === PM2 global (como root, pero correrá para el usuario normal) ===
+            if ! command -v pm2 >/dev/null 2>&1; then
+              sudo npm i -g pm2
+              # Registrar PM2 en systemd para este usuario
+              sudo env PATH=\$PATH:/usr/bin pm2 startup systemd -u '"$USER"' --hp /home/'"$USER"'
+            fi
 
-        # Recarga la aplicación con PM2 para un reinicio sin caídas
-        # Asegúrate de que PM2 esté instalado globalmente (`npm install -g pm2`)
-        # y de que tu aplicación se llame 'backend' en PM2.
-        pm2 reload backend --silent
-        EOF
+            # === App dir ===
+            mkdir -p /home/'"$USER"'/app/backend
+            cd /home/'"$USER"'/app/backend
+
+            # Instalar deps de producción
+            if [ -f package-lock.json ]; then
+              npm ci --omit=dev || npm install --omit=dev
+            else
+              npm install --omit=dev
+            fi
+
+            # === Arrancar o reiniciar con PM2 ===
+            # Si existe el proceso 'backend' lo reinicia; si no, lo crea.
+            if pm2 describe backend >/dev/null 2>&1; then
+              pm2 reload backend --update-env
+            else
+              # Ajusta el entrypoint si es distinto (por ejemplo dist/index.js)
+              # Si tu build deja el entrypoint en dist/index.js:
+              if [ -f dist/index.js ]; then
+                pm2 start dist/index.js --name backend
+              else
+                pm2 start index.js --name backend
+              fi
+            fi
+
+            pm2 save
+            pm2 status
+          "'
+
 
