@@ -51,24 +51,18 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-region: eu-north-1   # <- Estocolmo
+          aws-region: eu-north-1   # Estocolmo
 
-      # 6) Deploy en EC2
-      - name: Deploy to EC2
+      # 6) Deploy en EC2 usando SSM (sin PEM)
+      - name: Deploy to EC2 with SSM
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_INSTANCE }} << 'EOF'
-            cd ~/AI4Devs-week12-pipeline-sr-01 || git clone https://github.com/adriansendin/AI4Devs-week12-pipeline-sr-01.git
-            cd AI4Devs-week12-pipeline-sr-01
-            git pull origin pipeline-ASM
-
-            # Backend
-            cd backend
-            npm install
-            npm run build
-            nohup npm start > backend.log 2>&1 &
-
-            # Frontend
-            cd ../frontend
-            npm install -g serve
-            nohup serve -s build -l 3000 > frontend.log 2>&1 &
-          EOF
+          aws ssm send-command \
+            --targets "Key=instanceIds,Values=${{ secrets.EC2_INSTANCE }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy LTI app" \
+            --parameters 'commands=[
+              "cd ~/AI4Devs-week12-pipeline-sr-01 || git clone https://github.com/adriansendin/AI4Devs-week12-pipeline-sr-01.git",
+              "cd AI4Devs-week12-pipeline-sr-01 && git pull origin pipeline-ASM",
+              "cd backend && npm install && npm run build && nohup npm start > backend.log 2>&1 &",
+              "cd ../frontend && npm install -g serve && nohup serve -s build -l 3000 > frontend.log 2>&1 &"
+            ]'
