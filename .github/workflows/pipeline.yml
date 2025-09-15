@@ -1,70 +1,3 @@
-name: LTI Pipeline
-
-on:
-  push:
-    branches: [pipeline-ASM]
-  pull_request:
-    branches: [main]
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      - name: Install backend deps
-        working-directory: backend
-        run: npm ci
-
-      - name: Test backend
-        working-directory: backend
-        run: npm test --silent
-
-      - name: Build backend
-        working-directory: backend
-        run: npm run build
-
-      - name: Install frontend deps
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-region: eu-north-1
-
-      - name: Get EC2 Instance ID (from public IP or keep if Id)
-        id: get_instance_id
-        shell: bash
-        run: |
-          set -euo pipefail
-          TARGET="${{ secrets.EC2_INSTANCE }}"
-          if [[ "$TARGET" =~ ^i-[A-Za-z0-9]+$ ]]; then
-            echo "instance_id=$TARGET" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          IID=$(aws ec2 describe-instances \
-            --filters "Name=ip-address,Values=$TARGET" \
-            --query "Reservations[].Instances[].InstanceId" \
-            --output text)
-          if [ -z "$IID" ] || [ "$IID" = "None" ]; then
-            echo "No se pudo resolver InstanceId desde $TARGET" >&2
-            exit 1
-          fi
-          echo "instance_id=$IID" >> "$GITHUB_OUTPUT"
-
       - name: Deploy to EC2 via SSM
         shell: bash
         run: |
@@ -97,15 +30,15 @@ jobs:
           cd ../frontend
           npm ci
           npm run build
-          npx --yes serve@14 -s build -l 3000 > ~/frontend.log 2>&1 &
+          nohup npx --yes serve@14 -s build -l 3000 > ~/frontend.log 2>&1 &
           EOS
 
-          # Preparar parámetros JSON para SSM (evita problemas de comillas)
-          B64=$(base64 -w 0 deploy.sh)
+          # Codificar en base64 compatible
+          B64=$(base64 deploy.sh | tr -d '\n')
           cat > params.json <<EOF
           {
             "commands": [
-              "bash -lc \"echo $B64 | base64 -d > /home/ec2-user/deploy.sh && chmod +x /home/ec2-user/deploy.sh && /home/ec2-user/deploy.sh\""
+              "echo $B64 | base64 -d > /tmp/deploy.sh && chmod +x /tmp/deploy.sh && bash /tmp/deploy.sh"
             ]
           }
           EOF
