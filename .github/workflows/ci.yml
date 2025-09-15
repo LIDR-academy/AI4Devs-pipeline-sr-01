@@ -69,11 +69,19 @@ jobs:
 
         # Nos conectamos a la instancia para instalar dependencias y reiniciar la aplicación
         ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
+        # Carga NVM (Node Version Manager) para tener acceso a node, npm y pm2
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+        # Navega al directorio de la aplicación
         cd ~/app/backend
+
+        # Instala dependencias de producción
         npm install --omit=dev
-        # Asumimos que usas pm2 para gestionar tu aplicación.
-        # 'pm2 reload <app_name>' reinicia la app sin downtime.
-        # Cambia 'backend' por el nombre de tu proceso en pm2.
+
+        # Recarga la aplicación con PM2 para un reinicio sin caídas
+        # Asegúrate de que PM2 esté instalado globalmente (`npm install -g pm2`)
+        # y de que tu aplicación se llame 'backend' en PM2.
         pm2 reload backend --silent
         EOF
 
