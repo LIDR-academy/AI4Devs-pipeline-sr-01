@@ -1,0 +1,109 @@
+name: Deploy Backend App to EC2
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (for build & tests in CI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: ./backend
+        run: npm test -- --passWithNoTests
+
+      - name: Build application
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-region: 'eu-north-1'
+  
+      - name: Deploy to EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.EC2_INSTANCE }}
+          USER: ${{ secrets.EC2_USER }}
+        run: |
+          # Crear archivo de clave privada
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          
+          # Crear directorio de despliegue si no existe
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST "mkdir -p ~/app/backend"
+          
+          # Transferir artefactos construidos + package files + schema de Prisma (imprescindible)
+          scp -o StrictHostKeyChecking=no -i private_key.pem -r \
+            ./backend/dist \
+            ./backend/package.json \
+            ./backend/package-lock.json \
+            ./backend/prisma \
+            $USER@$HOST:~/app/backend/
+          
+          # Preparar entorno e iniciar/reiniciar con PM2 en la EC2
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST 'bash -lc "
+            set -e
+
+            # Instalar Node.js y npm si no existen (Amazon Linux 2023)
+            if ! command -v node >/dev/null 2>&1; then
+              sudo dnf -y install nodejs20 nodejs20-npm || sudo dnf -y install nodejs
+              sudo alternatives --set node /usr/bin/node-20 || true
+              sudo alternatives --set npm  /usr/bin/npm-20  || true
+            fi
+
+            # Instalar PM2 global si no existe y registrarlo en systemd para este usuario
+            if ! command -v pm2 >/dev/null 2>&1; then
+              sudo npm i -g pm2
+              sudo env PATH=\$PATH:/usr/bin pm2 startup systemd -u '"$USER"' --hp /home/'"$USER"'
+            fi
+
+            # Instalar dependencias de producción
+            cd ~/app/backend
+            if [ -f package-lock.json ]; then
+              npm ci --omit=dev || npm install --omit=dev
+            else
+              npm install --omit=dev
+            fi
+
+            # Generar Prisma Client (evita el error '@prisma/client did not initialize yet')
+            if [ -f ./prisma/schema.prisma ]; then
+              npm i prisma --no-save
+              npx prisma generate --schema=./prisma/schema.prisma
+              # Si usas migraciones en despliegue, descomenta:
+              # npx prisma migrate deploy
+            fi
+
+            # Iniciar o recargar con PM2
+            if pm2 describe backend >/dev/null 2>&1; then
+              pm2 reload backend --update-env
+            else
+              if [ -f dist/index.js ]; then
+                pm2 start dist/index.js --name backend
+              else
+                pm2 start index.js --name backend
+              fi
+            fi
+
+            pm2 save
+          "'
+          
+          # Limpiar archivo de clave
+          rm -f private_key.pem
