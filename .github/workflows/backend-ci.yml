@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   push:
-    branches: [ create_ci_workflow ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -77,3 +77,98 @@ jobs:
       with:
         name: backend-build
         path: backend/dist/
+
+  deploy-to-ec2:
+    needs: backend-test-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: backend-build
+        path: backend/dist/
+
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_INSTANCE }} >> ~/.ssh/known_hosts
+
+    - name: Create deployment package
+      run: |
+        # Create a deployment directory with all necessary files
+        mkdir -p deployment
+        
+        # Copy backend files
+        cp -r backend/dist deployment/
+        cp backend/package.json deployment/
+        cp backend/package-lock.json deployment/
+        cp -r backend/prisma deployment/
+        cp backend/.env deployment/
+        
+        # Create deployment script
+        cat > deployment/deploy.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        # Navigate to app directory
+        cd /home/ec2-user/lti-backend
+        
+        # Stop existing application
+        pm2 stop lti-backend || true
+        
+        # Install/update dependencies (production only)
+        npm ci --only=production
+        
+        # Generate Prisma client
+        npx prisma generate
+        
+        # Run database migrations
+        npx prisma migrate deploy
+        
+        # Start application with PM2
+        pm2 start dist/index.js --name lti-backend --update-env
+        
+        # Save PM2 configuration
+        pm2 save
+        
+        # Show status
+        pm2 status
+        EOF
+        
+        chmod +x deployment/deploy.sh
+
+    - name: Deploy to EC2
+      run: |
+        # Create app directory on EC2 if it doesn't exist
+        ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_INSTANCE }} "mkdir -p /home/ec2-user/lti-backend"
+        
+        # Copy files to EC2
+        scp -i ~/.ssh/id_rsa -r deployment/* ec2-user@${{ secrets.EC2_INSTANCE }}:/home/ec2-user/lti-backend/
+        
+        # Ensure database is running
+        ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_INSTANCE }} "cd /home/ec2-user/lti-backend && ./start-database.sh"
+        
+        # Execute deployment script on EC2
+        ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_INSTANCE }} "cd /home/ec2-user/lti-backend && ./deploy.sh"
+
+    - name: Health check
+      run: |
+        # Wait a moment for the application to start
+        sleep 10
+        
+        # Check if the application is responding
+        ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_INSTANCE }} "curl -f http://localhost:3010/health || exit 1"
+      continue-on-error: true
+
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -rf ~/.ssh/id_rsa
+        rm -rf deployment/

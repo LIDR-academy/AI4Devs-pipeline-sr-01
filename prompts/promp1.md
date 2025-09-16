@@ -1,4 +1,4 @@
-# ROL
+# ROLE
 you are a senior devOps engineer
 
 # Context
@@ -15,3 +15,6 @@ Create a GitHub Actions workflow in YAML formatt that will:.
 
 # Extra considerations
 The steps I mention are based on my limited knowledge on GitHub actions set up, so if you consider there are other steps needed you can add them explaining to me why they are needed.
+
+---
+is it posible to get the @backend-ci.yml#L18-20  database environment variables from the @.env file?
