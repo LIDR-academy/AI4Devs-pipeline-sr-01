@@ -1,6 +1,6 @@
 # LTI - Sistema de Seguimiento de Talento
 
-Este proyecto es una aplicación full-stack con un frontend en React y un backend en Express usando Prisma como un ORM. El frontend se inicia con Create React App y el backend está escrito en TypeScript.
+Este proyecto es una aplicación full-stack con un frontend en React y un backend en Express usando Prisma como un ORM. El frontend se inicia con Create React App y el backend está escrito en TypeScript..
 
 ## Explicación de Directorios y Archivos
 
@@ -211,4 +211,4 @@ Para que el flujo de trabajo de GitHub Actions funcione correctamente, debes con
 
 1. **AWS_ACCESS_ID**: Tu ID de clave de acceso de AWS.
 2. **AWS_ACCESS_KEY**: Tu clave de acceso secreta de AWS.
-3. **EC2_INSTANCE**: La dirección IP pública o el nombre DNS de tu instancia EC2.
+3. **EC2_INSTANCE**: La dirección IP pública o el nombre DNS de tu instancia EC2.# Test deployment
