@@ -1,0 +1,134 @@
+{
+	"type": "object",
+	"required": ["partitions", "boundaries", "scenarios", "negatives", "oracle_rules", "assumptions"],
+	"properties": {
+		"partitions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid PDF file upload",
+				"Valid DOCX file upload",
+				"Valid file upload with standard filename",
+				"Valid file upload with special characters in filename",
+				"Valid file upload with long filename",
+				"Valid file upload with short filename",
+				"Valid file upload within size limit (under 10MB)",
+				"Valid file upload at size limit (exactly 10MB)",
+				"Invalid file type (TXT, JPG, PNG, etc.)",
+				"Invalid file upload exceeding size limit (over 10MB)",
+				"Invalid file upload with no file",
+				"Invalid file upload with corrupted file"
+			]
+		},
+		"boundaries": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"File type: must be PDF or DOCX only",
+				"File size: maximum 10MB (10,485,760 bytes)",
+				"File format: multipart/form-data",
+				"File field name: 'file'",
+				"Response: includes filePath and fileType",
+				"File storage: saves to '../uploads/' directory",
+				"File naming: uses timestamp + original filename",
+				"File validation: checks MIME type",
+				"File validation: checks file extension",
+				"Error response: includes appropriate HTTP status code",
+				"Success response: returns 200 status",
+				"File path: must be accessible and unique"
+			]
+		},
+		"scenarios": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Upload PDF resume with standard filename",
+				"Upload DOCX resume with standard filename",
+				"Upload PDF with special characters in filename",
+				"Upload DOCX with spaces in filename",
+				"Upload PDF with long filename (over 100 characters)",
+				"Upload DOCX with short filename (under 10 characters)",
+				"Upload PDF with Unicode characters in filename",
+				"Upload DOCX with numbers in filename",
+				"Upload PDF with mixed case filename",
+				"Upload DOCX with file extension in uppercase",
+				"Upload PDF with multiple dots in filename",
+				"Upload DOCX with hyphenated filename"
+			]
+		},
+		"negatives": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"No file provided in request",
+				"File field name is not 'file'",
+				"File type is TXT (text/plain)",
+				"File type is JPG (image/jpeg)",
+				"File type is PNG (image/png)",
+				"File type is GIF (image/gif)",
+				"File type is MP4 (video/mp4)",
+				"File type is ZIP (application/zip)",
+				"File type is EXE (application/x-executable)",
+				"File size exceeds 10MB limit",
+				"File size is exactly 0 bytes",
+				"File is corrupted or unreadable",
+				"File has no extension",
+				"File has wrong extension (e.g., .pdf file with DOCX content)",
+				"File has multiple extensions",
+				"File has hidden characters in filename",
+				"File has system reserved characters",
+				"File has extremely long filename (over 255 characters)",
+				"File has null bytes in filename",
+				"File has invalid UTF-8 encoding",
+				"File upload directory does not exist",
+				"File upload directory has no write permissions",
+				"Disk space insufficient for file storage",
+				"File upload timeout",
+				"Network interruption during upload"
+			]
+		},
+		"oracle_rules": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid PDF upload returns 200 status with filePath and fileType",
+				"Valid DOCX upload returns 200 status with filePath and fileType",
+				"Invalid file type returns 400 status with 'Invalid file type' error",
+				"File too large returns 500 status with 'File too large' error",
+				"No file provided returns 400 status with 'Invalid file type' error",
+				"Server error returns 500 status with error message",
+				"Response includes filePath with timestamp prefix",
+				"Response includes fileType as MIME type string",
+				"File is saved to '../uploads/' directory",
+				"File naming uses timestamp + original filename format",
+				"File validation checks MIME type before saving",
+				"File validation checks file size before saving",
+				"Error responses include descriptive error messages",
+				"Success responses include both filePath and fileType",
+				"File upload is atomic (all or nothing)"
+			]
+		},
+		"assumptions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Upload directory '../uploads/' exists and is writable",
+				"Server has sufficient disk space for file storage",
+				"File upload middleware (multer) is properly configured",
+				"File size limit is set to 10MB",
+				"File type validation uses MIME type checking",
+				"File naming uses timestamp for uniqueness",
+				"File storage uses disk storage (not memory)",
+				"File validation occurs before file saving",
+				"Error handling covers all multer error types",
+				"File paths are relative to server root",
+				"File permissions allow read access after upload",
+				"Network connectivity is stable during upload",
+				"Server memory is sufficient for file processing",
+				"File system supports the uploaded file types",
+				"Timestamp generation is accurate and unique"
+			]
+		}
+	},
+	"additionalProperties": false
+}

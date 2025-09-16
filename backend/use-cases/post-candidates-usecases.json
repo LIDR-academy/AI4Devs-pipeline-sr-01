@@ -1,0 +1,143 @@
+{
+	"type": "object",
+	"required": ["partitions", "boundaries", "scenarios", "negatives", "oracle_rules", "assumptions"],
+	"properties": {
+		"partitions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid candidate data with all required fields",
+				"Valid candidate data with optional fields",
+				"Valid candidate data with education history",
+				"Valid candidate data with work experience",
+				"Valid candidate data with CV information",
+				"Invalid candidate data with missing required fields",
+				"Invalid candidate data with malformed email",
+				"Invalid candidate data with malformed phone",
+				"Invalid candidate data with invalid name characters",
+				"Invalid candidate data with email already exists",
+				"Invalid candidate data with education date format errors",
+				"Invalid candidate data with work experience date format errors"
+			]
+		},
+		"boundaries": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"firstName: minimum 2 characters, maximum 50 characters",
+				"lastName: minimum 2 characters, maximum 50 characters",
+				"email: valid email format with domain",
+				"phone: international phone format with country code",
+				"address: maximum 100 characters",
+				"education.institution: maximum 100 characters",
+				"education.title: maximum 100 characters",
+				"education.startDate: YYYY-MM-DD format",
+				"education.endDate: YYYY-MM-DD format or null",
+				"workExperience.company: maximum 100 characters",
+				"workExperience.position: maximum 100 characters",
+				"workExperience.description: maximum 200 characters",
+				"workExperience.startDate: YYYY-MM-DD format",
+				"workExperience.endDate: YYYY-MM-DD format or null",
+				"cv.filePath: string path to file",
+				"cv.fileType: MIME type string"
+			]
+		},
+		"scenarios": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Create candidate with minimal required data (firstName, lastName, email)",
+				"Create candidate with complete personal information including phone and address",
+				"Create candidate with single education record",
+				"Create candidate with multiple education records",
+				"Create candidate with single work experience",
+				"Create candidate with multiple work experiences",
+				"Create candidate with CV file information",
+				"Create candidate with complete profile (all fields populated)",
+				"Create candidate with education but no end date (ongoing education)",
+				"Create candidate with work experience but no end date (current job)",
+				"Create candidate with mixed education and work experience data",
+				"Create candidate with Spanish characters in names"
+			]
+		},
+		"negatives": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Missing firstName field",
+				"Missing lastName field",
+				"Missing email field",
+				"Empty firstName string",
+				"Empty lastName string",
+				"Empty email string",
+				"firstName with less than 2 characters",
+				"lastName with less than 2 characters",
+				"firstName with more than 50 characters",
+				"lastName with more than 50 characters",
+				"Invalid email format without @ symbol",
+				"Invalid email format without domain",
+				"Invalid email format with spaces",
+				"Invalid phone format without country code",
+				"Invalid phone format with letters",
+				"Address with more than 100 characters",
+				"Education institution with more than 100 characters",
+				"Education title with more than 100 characters",
+				"Education startDate in wrong format (DD-MM-YYYY)",
+				"Education endDate in wrong format (MM/DD/YYYY)",
+				"Work experience company with more than 100 characters",
+				"Work experience position with more than 100 characters",
+				"Work experience description with more than 200 characters",
+				"Work experience startDate in wrong format",
+				"Work experience endDate in wrong format",
+				"Names with special characters (@, #, $, etc.)",
+				"Names with numbers",
+				"Duplicate email address in database",
+				"Invalid JSON structure",
+				"Extra unexpected fields in request"
+			]
+		},
+		"oracle_rules": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid request returns 201 status with success message and candidate data",
+				"Invalid request returns 400 status with error message",
+				"Duplicate email returns 400 status with 'email already exists' error",
+				"Missing required fields returns 400 status with validation error",
+				"Invalid field formats return 400 status with format error",
+				"Server error returns 500 status with generic error message",
+				"Response includes generated candidate ID",
+				"Response includes all submitted candidate data",
+				"Education records are properly associated with candidate",
+				"Work experience records are properly associated with candidate",
+				"CV information is properly associated with candidate",
+				"Database transaction is atomic (all or nothing)",
+				"Email uniqueness constraint is enforced",
+				"All string validations are applied correctly",
+				"Date format validations are applied correctly"
+			]
+		},
+		"assumptions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Database connection is available and working",
+				"Email uniqueness constraint exists in database",
+				"All required database tables exist (Candidate, Education, WorkExperience, Resume)",
+				"File upload directory exists for CV storage",
+				"Input data is properly parsed from JSON",
+				"Validation occurs before database operations",
+				"Transaction rollback occurs on any error",
+				"Generated IDs are unique and sequential",
+				"Date strings are in ISO format (YYYY-MM-DD)",
+				"Phone numbers can include international formats",
+				"Names support Spanish characters (ñ, á, é, í, ó, ú)",
+				"Optional fields can be null or undefined",
+				"Array fields default to empty arrays if not provided",
+				"Server has sufficient memory for data processing",
+				"Network connectivity is stable during request processing"
+			]
+		}
+	},
+	"additionalProperties": false
+}

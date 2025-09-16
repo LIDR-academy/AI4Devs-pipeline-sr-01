@@ -1,0 +1,1 @@
+Using the functionality implementation of the routes, generate a YAML slice for each endpoint on a folder called "slices"

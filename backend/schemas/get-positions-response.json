@@ -1,0 +1,65 @@
+{
+	"type": "array",
+	"items": {
+		"type": "object",
+		"required": ["id", "title", "description", "status", "isVisible", "location", "jobDescription", "companyId", "interviewFlowId"],
+		"properties": {
+			"id": {
+				"type": "integer"
+			},
+			"title": {
+				"type": "string"
+			},
+			"description": {
+				"type": "string"
+			},
+			"status": {
+				"type": "string"
+			},
+			"isVisible": {
+				"type": "boolean"
+			},
+			"location": {
+				"type": "string"
+			},
+			"jobDescription": {
+				"type": "string"
+			},
+			"salaryMin": {
+				"type": "number"
+			},
+			"salaryMax": {
+				"type": "number"
+			},
+			"employmentType": {
+				"type": "string"
+			},
+			"benefits": {
+				"type": "string"
+			},
+			"requirements": {
+				"type": "string"
+			},
+			"responsibilities": {
+				"type": "string"
+			},
+			"companyDescription": {
+				"type": "string"
+			},
+			"applicationDeadline": {
+				"type": "string",
+				"format": "date-time"
+			},
+			"contactInfo": {
+				"type": "string"
+			},
+			"companyId": {
+				"type": "integer"
+			},
+			"interviewFlowId": {
+				"type": "integer"
+			}
+		},
+		"additionalProperties": false
+	}
+}

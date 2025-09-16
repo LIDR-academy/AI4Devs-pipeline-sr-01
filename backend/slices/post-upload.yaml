@@ -1,0 +1,54 @@
+post:
+  summary: Upload a file
+  description: Uploads a file to the server. Only PDF and DOCX files are allowed with a maximum size of 10MB.
+  requestBody:
+    required: true
+    content:
+      multipart/form-data:
+        schema:
+          type: object
+          properties:
+            file:
+              type: string
+              format: binary
+              description: File to be uploaded (PDF or DOCX only, max 10MB)
+  responses:
+    '200':
+      description: File uploaded successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              filePath:
+                type: string
+                description: Path where the file is stored
+                example: "../uploads/1703123456789-resume.pdf"
+              fileType:
+                type: string
+                description: MIME type of the uploaded file
+                example: "application/pdf"
+    '400':
+      description: Invalid file type, only PDF and DOCX are allowed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Invalid file type, only PDF and DOCX are allowed!"
+    '500':
+      description: Error during the file upload process
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                examples:
+                  multer_error:
+                    value: "File too large"
+                  general_error:
+                    value: "Unexpected error occurred"

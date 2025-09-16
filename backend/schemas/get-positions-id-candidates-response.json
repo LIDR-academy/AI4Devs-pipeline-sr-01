@@ -1,0 +1,25 @@
+{
+	"type": "array",
+	"items": {
+		"type": "object",
+		"required": ["fullName", "currentInterviewStep", "candidateId", "applicationId", "averageScore"],
+		"properties": {
+			"fullName": {
+				"type": "string"
+			},
+			"currentInterviewStep": {
+				"type": "string"
+			},
+			"candidateId": {
+				"type": "integer"
+			},
+			"applicationId": {
+				"type": "integer"
+			},
+			"averageScore": {
+				"type": "number"
+			}
+		},
+		"additionalProperties": false
+	}
+}

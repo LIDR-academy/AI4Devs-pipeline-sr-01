@@ -1,0 +1,126 @@
+{
+	"type": "object",
+	"required": ["partitions", "boundaries", "scenarios", "negatives", "oracle_rules", "assumptions"],
+	"properties": {
+		"partitions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid position ID with complete interview flow",
+				"Valid position ID with interview flow having multiple steps",
+				"Valid position ID with interview flow having single step",
+				"Valid position ID with interview flow having ordered steps",
+				"Valid position ID with interview flow having different interview types",
+				"Valid position ID with interview flow having descriptions",
+				"Invalid position ID format (non-numeric)",
+				"Invalid position ID (negative number)",
+				"Invalid position ID (zero)",
+				"Valid position ID that does not exist",
+				"Valid position ID with no interview flow",
+				"Valid position ID with interview flow having no steps"
+			]
+		},
+		"boundaries": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Position ID: must be positive integer",
+				"Position ID: must exist in Position table",
+				"Position: must have associated InterviewFlow",
+				"Response: nested object with interviewFlow containing positionName and interviewFlow",
+				"Response: interviewFlow includes id, description, and interviewSteps array",
+				"Response: each interviewStep includes id, interviewFlowId, interviewTypeId, name, orderIndex",
+				"Database query: joins Position, InterviewFlow, and InterviewStep tables",
+				"Database query: filters by positionId",
+				"Database query: orders interviewSteps by orderIndex",
+				"Error response: includes appropriate HTTP status code",
+				"Response format: follows nested structure from implementation"
+			]
+		},
+		"scenarios": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Retrieve interview flow for position with 3-step process (Screening, Technical, Manager)",
+				"Retrieve interview flow for position with 2-step process (HR, Technical)",
+				"Retrieve interview flow for position with 4-step process (Screening, Technical, Manager, Final)",
+				"Retrieve interview flow for position with single step (HR Interview)",
+				"Retrieve interview flow for position with different interview types",
+				"Retrieve interview flow for position with custom step names",
+				"Retrieve interview flow for position with ordered steps (1, 2, 3, 4)",
+				"Retrieve interview flow for position with unordered steps",
+				"Retrieve interview flow for position with duplicate order indices",
+				"Retrieve interview flow for position with missing step descriptions",
+				"Retrieve interview flow for position with all step details",
+				"Retrieve interview flow for position with minimal step information"
+			]
+		},
+		"negatives": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Position ID as string 'abc' (non-numeric)",
+				"Position ID as string '12.5' (decimal number)",
+				"Position ID as string '-1' (negative number)",
+				"Position ID as string '0' (zero)",
+				"Position ID as empty string ''",
+				"Position ID as null",
+				"Position ID as undefined",
+				"Position ID as boolean true",
+				"Position ID as boolean false",
+				"Position ID as array [1]",
+				"Position ID as object {id: 1}",
+				"Position ID with special characters '1@'",
+				"Position ID with spaces ' 1 '",
+				"Position ID with leading zeros '001'",
+				"Valid ID format but position does not exist",
+				"Valid ID format but position has no interview flow",
+				"Valid ID format but interview flow has no steps",
+				"Valid ID format but database connection fails"
+			]
+		},
+		"oracle_rules": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid position ID returns 200 status with nested interview flow object",
+				"Non-existent position returns 404 status with 'Position not found' error",
+				"Server error returns 500 status with 'Server error' error",
+				"Response includes interviewFlow wrapper object",
+				"Response includes positionName as string",
+				"Response includes interviewFlow with id, description, and interviewSteps",
+				"Response includes interviewSteps as ordered array",
+				"Each interviewStep includes all required fields",
+				"InterviewSteps are ordered by orderIndex",
+				"Database query efficiently joins Position, InterviewFlow, and InterviewStep tables",
+				"Response format matches nested structure from implementation",
+				"All integer fields are properly formatted",
+				"All string fields are properly encoded",
+				"Error responses include message and error fields",
+				"Database query handles missing relationships gracefully"
+			]
+		},
+		"assumptions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Database connection is available and working",
+				"Position, InterviewFlow, and InterviewStep tables exist",
+				"Foreign key relationships are properly configured",
+				"Position ID parameter is passed as string in URL path",
+				"ID parsing uses parseInt() function",
+				"Database queries use Prisma ORM with proper joins",
+				"Response serialization handles nested objects correctly",
+				"HTTP status codes follow REST conventions",
+				"Error messages are descriptive and helpful",
+				"Database performance is acceptable for join operations",
+				"InterviewSteps are properly ordered by orderIndex",
+				"All table relationships are properly indexed",
+				"Database transactions are not required for read operations",
+				"Memory is sufficient for result set processing",
+				"Nested response structure matches implementation exactly"
+			]
+		}
+	},
+	"additionalProperties": false
+}

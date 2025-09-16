@@ -1,0 +1,14 @@
+{
+	"type": "object",
+	"required": ["filePath", "fileType"],
+	"properties": {
+		"filePath": {
+			"type": "string"
+		},
+		"fileType": {
+			"type": "string",
+			"enum": ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+		}
+	},
+	"additionalProperties": false
+}

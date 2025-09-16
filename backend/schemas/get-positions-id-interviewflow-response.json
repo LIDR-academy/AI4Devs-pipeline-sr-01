@@ -1,0 +1,55 @@
+{
+	"type": "object",
+	"required": ["interviewFlow"],
+	"properties": {
+		"interviewFlow": {
+			"type": "object",
+			"required": ["positionName", "interviewFlow"],
+			"properties": {
+				"positionName": {
+					"type": "string"
+				},
+				"interviewFlow": {
+					"type": "object",
+					"required": ["id", "description", "interviewSteps"],
+					"properties": {
+						"id": {
+							"type": "integer"
+						},
+						"description": {
+							"type": "string"
+						},
+						"interviewSteps": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"required": ["id", "interviewFlowId", "interviewTypeId", "name", "orderIndex"],
+								"properties": {
+									"id": {
+										"type": "integer"
+									},
+									"interviewFlowId": {
+										"type": "integer"
+									},
+									"interviewTypeId": {
+										"type": "integer"
+									},
+									"name": {
+										"type": "string"
+									},
+									"orderIndex": {
+										"type": "integer"
+									}
+								},
+								"additionalProperties": false
+							}
+						}
+					},
+					"additionalProperties": false
+				}
+			},
+			"additionalProperties": false
+		}
+	},
+	"additionalProperties": false
+}
