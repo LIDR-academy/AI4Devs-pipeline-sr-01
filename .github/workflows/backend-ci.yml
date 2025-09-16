@@ -93,12 +93,12 @@ jobs:
         name: backend-build
         path: backend/dist/
 
-    - name: Setup SSH key
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.EC2_INSTANCE }} >> ~/.ssh/known_hosts
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-region: 'eu-north-1'
 
     - name: Create deployment package
       run: |
@@ -145,30 +145,42 @@ jobs:
         chmod +x deployment/deploy.sh
 
     - name: Deploy to EC2
+      env:
+        PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.EC2_INSTANCE }}
+        USER: ec2-user
       run: |
+        # Create private key file
+        echo "$PRIVATE_KEY" > private_key.pem
+        chmod 600 private_key.pem
+        
         # Create app directory on EC2 if it doesn't exist
-        ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_INSTANCE }} "mkdir -p /home/ec2-user/lti-backend"
+        ssh -i private_key.pem -o StrictHostKeyChecking=no $USER@$HOST "mkdir -p /home/ec2-user/lti-backend"
         
         # Copy files to EC2
-        scp -i ~/.ssh/id_rsa -r deployment/* ec2-user@${{ secrets.EC2_INSTANCE }}:/home/ec2-user/lti-backend/
-        
-        # Ensure database is running
-        ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_INSTANCE }} "cd /home/ec2-user/lti-backend && ./start-database.sh"
+        scp -i private_key.pem -o StrictHostKeyChecking=no -r deployment/* $USER@$HOST:/home/ec2-user/lti-backend/
         
         # Execute deployment script on EC2
-        ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_INSTANCE }} "cd /home/ec2-user/lti-backend && ./deploy.sh"
+        ssh -i private_key.pem -o StrictHostKeyChecking=no $USER@$HOST "cd /home/ec2-user/lti-backend && ./deploy.sh"
 
     - name: Health check
+      env:
+        PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.EC2_INSTANCE }}
+        USER: ec2-user
       run: |
+        # Create private key file
+        echo "$PRIVATE_KEY" > private_key.pem
+        chmod 600 private_key.pem
+        
         # Wait a moment for the application to start
         sleep 10
         
         # Check if the application is responding
-        ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_INSTANCE }} "curl -f http://localhost:3010/health || exit 1"
+        ssh -i private_key.pem -o StrictHostKeyChecking=no $USER@$HOST "curl -f http://localhost:3010/health || exit 1"
       continue-on-error: true
 
     - name: Cleanup
       if: always()
       run: |
-        rm -rf ~/.ssh/id_rsa
-        rm -rf deployment/
+        rm -f private_key.pem
