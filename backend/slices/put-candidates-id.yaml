@@ -1,0 +1,107 @@
+put:
+  summary: Update candidate stage
+  description: Updates the interview stage of a specific candidate.
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+      description: ID of the candidate
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            applicationId:
+              type: integer
+              description: ID of the application
+            currentInterviewStep:
+              type: integer
+              description: Current interview step
+  responses:
+    '200':
+      description: Candidate stage updated successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Candidate stage updated successfully"
+              data:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  positionId:
+                    type: integer
+                  candidateId:
+                    type: integer
+                  applicationDate:
+                    type: string
+                    format: date-time
+                  currentInterviewStep:
+                    type: integer
+                  notes:
+                    type: string
+                    nullable: true
+                  interviews:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        interviewDate:
+                          type: string
+                          format: date-time
+                        interviewStep:
+                          type: string
+                        score:
+                          type: number
+                          nullable: true
+    '400':
+      description: Invalid input data
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Error updating candidate stage"
+              error:
+                type: string
+                examples:
+                  invalid_position_id:
+                    value: "Invalid position ID format"
+                  invalid_interview_step:
+                    value: "Invalid currentInterviewStep format"
+    '404':
+      description: Application not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Application not found"
+              error:
+                type: string
+                example: "Error: Application not found"
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Error updating candidate stage"
+              error:
+                type: string
+                example: "Unknown error"

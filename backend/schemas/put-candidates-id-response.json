@@ -1,0 +1,56 @@
+{
+	"type": "object",
+	"required": ["message", "data"],
+	"properties": {
+		"message": {
+			"type": "string",
+			"const": "Candidate stage updated successfully"
+		},
+		"data": {
+			"type": "object",
+			"required": ["id", "positionId", "candidateId", "applicationDate", "currentInterviewStep"],
+			"properties": {
+				"id": {
+					"type": "integer"
+				},
+				"positionId": {
+					"type": "integer"
+				},
+				"candidateId": {
+					"type": "integer"
+				},
+				"applicationDate": {
+					"type": "string",
+					"format": "date-time"
+				},
+				"currentInterviewStep": {
+					"type": "integer"
+				},
+				"notes": {
+					"type": "string"
+				},
+				"interviews": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"interviewDate": {
+								"type": "string",
+								"format": "date-time"
+							},
+							"interviewStep": {
+								"type": "string"
+							},
+							"score": {
+								"type": "number"
+							}
+						},
+						"additionalProperties": false
+					}
+				}
+			},
+			"additionalProperties": false
+		}
+	},
+	"additionalProperties": false
+}

@@ -1,0 +1,15 @@
+{
+	"type": "object",
+	"required": ["applicationId", "currentInterviewStep"],
+	"properties": {
+		"applicationId": {
+			"type": "integer",
+			"minimum": 1
+		},
+		"currentInterviewStep": {
+			"type": "integer",
+			"minimum": 1
+		}
+	},
+	"additionalProperties": false
+}

@@ -1,0 +1,127 @@
+{
+	"type": "object",
+	"required": ["partitions", "boundaries", "scenarios", "negatives", "oracle_rules", "assumptions"],
+	"properties": {
+		"partitions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid position ID with multiple candidates",
+				"Valid position ID with single candidate",
+				"Valid position ID with no candidates",
+				"Valid position ID with candidates having interview scores",
+				"Valid position ID with candidates having no interview scores",
+				"Valid position ID with candidates in different interview stages",
+				"Valid position ID with candidates having mixed interview progress",
+				"Invalid position ID format (non-numeric)",
+				"Invalid position ID (negative number)",
+				"Invalid position ID (zero)",
+				"Valid position ID that does not exist",
+				"Valid position ID with candidates having null scores"
+			]
+		},
+		"boundaries": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Position ID: must be positive integer",
+				"Position ID: must exist in Position table",
+				"Response: array of candidate objects",
+				"Response: each candidate includes fullName (firstName + lastName)",
+				"Response: each candidate includes currentInterviewStep name",
+				"Response: each candidate includes candidateId and applicationId",
+				"Response: each candidate includes averageScore (can be 0)",
+				"Database query: joins Application, Candidate, InterviewStep, and Interview tables",
+				"Database query: filters by positionId",
+				"Score calculation: averages all interview scores for each candidate",
+				"Score calculation: returns 0 if no interviews exist",
+				"Error response: includes appropriate HTTP status code"
+			]
+		},
+		"scenarios": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Retrieve candidates for position with multiple applications",
+				"Retrieve candidates with high average scores (4.0-5.0)",
+				"Retrieve candidates with medium average scores (2.0-3.9)",
+				"Retrieve candidates with low average scores (0.0-1.9)",
+				"Retrieve candidates in initial screening stage",
+				"Retrieve candidates in technical interview stage",
+				"Retrieve candidates in manager interview stage",
+				"Retrieve candidates in final decision stage",
+				"Retrieve candidates with no completed interviews",
+				"Retrieve candidates with single completed interview",
+				"Retrieve candidates with multiple completed interviews",
+				"Retrieve candidates with mixed interview progress"
+			]
+		},
+		"negatives": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Position ID as string 'abc' (non-numeric)",
+				"Position ID as string '12.5' (decimal number)",
+				"Position ID as string '-1' (negative number)",
+				"Position ID as string '0' (zero)",
+				"Position ID as empty string ''",
+				"Position ID as null",
+				"Position ID as undefined",
+				"Position ID as boolean true",
+				"Position ID as boolean false",
+				"Position ID as array [1]",
+				"Position ID as object {id: 1}",
+				"Position ID with special characters '1@'",
+				"Position ID with spaces ' 1 '",
+				"Position ID with leading zeros '001'",
+				"Valid ID format but position does not exist",
+				"Valid ID format but position has no applications",
+				"Valid ID format but database connection fails",
+				"Valid ID format but related tables are corrupted"
+			]
+		},
+		"oracle_rules": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid position ID returns 200 status with array of candidates",
+				"Position with no candidates returns 200 status with empty array",
+				"Server error returns 500 status with error message",
+				"Response includes fullName as concatenated firstName + lastName",
+				"Response includes currentInterviewStep as string name",
+				"Response includes candidateId and applicationId as integers",
+				"Response includes averageScore as calculated number",
+				"Average score calculation handles null interview scores",
+				"Average score calculation returns 0 for candidates with no interviews",
+				"Database query efficiently joins all required tables",
+				"Response format matches schema exactly",
+				"Array is properly formatted JSON",
+				"All candidate objects have consistent structure",
+				"Score calculations are mathematically correct",
+				"Error responses include message and error fields"
+			]
+		},
+		"assumptions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Database connection is available and working",
+				"Position, Application, Candidate, InterviewStep, and Interview tables exist",
+				"Foreign key relationships are properly configured",
+				"Position ID parameter is passed as string in URL path",
+				"ID parsing uses parseInt() function",
+				"Database queries use Prisma ORM with proper joins",
+				"Response serialization handles null values correctly",
+				"HTTP status codes follow REST conventions",
+				"Error messages are descriptive and helpful",
+				"Database performance is acceptable for join operations",
+				"Score calculations are performed in application layer",
+				"Interview scores are stored as numbers (not strings)",
+				"All table relationships are properly indexed",
+				"Database transactions are not required for read operations",
+				"Memory is sufficient for result set processing"
+			]
+		}
+	},
+	"additionalProperties": false
+}

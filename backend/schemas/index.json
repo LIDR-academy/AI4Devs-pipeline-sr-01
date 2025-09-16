@@ -1,0 +1,66 @@
+{
+	"schemas": {
+		"postCandidatesRequest": {
+			"$ref": "./post-candidates-request.json"
+		},
+		"postCandidatesResponse": {
+			"$ref": "./post-candidates-response.json"
+		},
+		"getCandidatesIdResponse": {
+			"$ref": "./get-candidates-id-response.json"
+		},
+		"putCandidatesIdRequest": {
+			"$ref": "./put-candidates-id-request.json"
+		},
+		"putCandidatesIdResponse": {
+			"$ref": "./put-candidates-id-response.json"
+		},
+		"getPositionsResponse": {
+			"$ref": "./get-positions-response.json"
+		},
+		"getPositionsIdCandidatesResponse": {
+			"$ref": "./get-positions-id-candidates-response.json"
+		},
+		"getPositionsIdInterviewflowResponse": {
+			"$ref": "./get-positions-id-interviewflow-response.json"
+		},
+		"postUploadResponse": {
+			"$ref": "./post-upload-response.json"
+		},
+		"errorResponses": {
+			"$ref": "./error-responses.json"
+		}
+	},
+	"endpoints": {
+		"POST /candidates": {
+			"request": "postCandidatesRequest",
+			"response": "postCandidatesResponse",
+			"errors": ["400BadRequest", "500InternalServerError"]
+		},
+		"GET /candidates/{id}": {
+			"response": "getCandidatesIdResponse",
+			"errors": ["400InvalidIdFormat", "404CandidateNotFound", "500ServerError"]
+		},
+		"PUT /candidates/{id}": {
+			"request": "putCandidatesIdRequest",
+			"response": "putCandidatesIdResponse",
+			"errors": ["400BadRequest", "404NotFound", "500InternalServerError"]
+		},
+		"GET /positions": {
+			"response": "getPositionsResponse",
+			"errors": ["500InternalServerError"]
+		},
+		"GET /positions/{id}/candidates": {
+			"response": "getPositionsIdCandidatesResponse",
+			"errors": ["500InternalServerError"]
+		},
+		"GET /positions/{id}/interviewflow": {
+			"response": "getPositionsIdInterviewflowResponse",
+			"errors": ["404NotFound", "500ServerError"]
+		},
+		"POST /upload": {
+			"response": "postUploadResponse",
+			"errors": ["400InvalidFileType", "500UploadError"]
+		}
+	}
+}

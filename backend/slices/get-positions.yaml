@@ -1,0 +1,81 @@
+get:
+  summary: Get all positions
+  description: Retrieves all visible positions from the system.
+  responses:
+    '200':
+      description: List of positions retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: Unique identifier for the position
+                title:
+                  type: string
+                  description: Title of the position
+                description:
+                  type: string
+                  description: Description of the position
+                status:
+                  type: string
+                  description: Status of the position
+                isVisible:
+                  type: boolean
+                  description: Visibility status of the position
+                location:
+                  type: string
+                  description: Location of the position
+                jobDescription:
+                  type: string
+                  description: Detailed job description
+                salaryMin:
+                  type: number
+                  description: Minimum salary
+                salaryMax:
+                  type: number
+                  description: Maximum salary
+                employmentType:
+                  type: string
+                  description: Type of employment
+                benefits:
+                  type: string
+                  description: Benefits offered
+                requirements:
+                  type: string
+                  description: Job requirements
+                responsibilities:
+                  type: string
+                  description: Job responsibilities
+                companyDescription:
+                  type: string
+                  description: Company description
+                applicationDeadline:
+                  type: string
+                  format: date-time
+                  description: Application deadline
+                contactInfo:
+                  type: string
+                  description: Contact information
+                companyId:
+                  type: integer
+                  description: Company ID
+                interviewFlowId:
+                  type: integer
+                  description: Interview flow ID
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Error retrieving positions"
+              error:
+                type: string
+                example: "Error retrieving all positions"

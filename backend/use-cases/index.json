@@ -1,0 +1,62 @@
+{
+	"use_cases": {
+		"postCandidates": {
+			"file": "./post-candidates-usecases.json",
+			"endpoint": "POST /candidates",
+			"description": "Use cases for creating new candidates with validation and data integrity"
+		},
+		"getCandidatesId": {
+			"file": "./get-candidates-id-usecases.json",
+			"endpoint": "GET /candidates/{id}",
+			"description": "Use cases for retrieving candidate details by ID"
+		},
+		"putCandidatesId": {
+			"file": "./put-candidates-id-usecases.json",
+			"endpoint": "PUT /candidates/{id}",
+			"description": "Use cases for updating candidate interview stage"
+		},
+		"getPositions": {
+			"file": "./get-positions-usecases.json",
+			"endpoint": "GET /positions",
+			"description": "Use cases for retrieving all visible positions"
+		},
+		"getPositionsIdCandidates": {
+			"file": "./get-positions-id-candidates-usecases.json",
+			"endpoint": "GET /positions/{id}/candidates",
+			"description": "Use cases for retrieving candidates by position with scores"
+		},
+		"getPositionsIdInterviewflow": {
+			"file": "./get-positions-id-interviewflow-usecases.json",
+			"endpoint": "GET /positions/{id}/interviewflow",
+			"description": "Use cases for retrieving interview flow by position"
+		},
+		"postUpload": {
+			"file": "./post-upload-usecases.json",
+			"endpoint": "POST /upload",
+			"description": "Use cases for file upload with type and size validation"
+		}
+	},
+	"categories": {
+		"candidate_management": [
+			"postCandidates",
+			"getCandidatesId",
+			"putCandidatesId"
+		],
+		"position_management": [
+			"getPositions",
+			"getPositionsIdCandidates",
+			"getPositionsIdInterviewflow"
+		],
+		"file_management": [
+			"postUpload"
+		]
+	},
+	"testing_framework": {
+		"partitions": "Input data categories for test case generation",
+		"boundaries": "Validation rules and constraints",
+		"scenarios": "Valid use case scenarios",
+		"negatives": "Invalid input and error conditions",
+		"oracle_rules": "Expected behavior and validation rules",
+		"assumptions": "System and environment assumptions"
+	}
+}

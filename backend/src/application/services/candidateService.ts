@@ -4,6 +4,9 @@ import { Education } from '../../domain/models/Education';
 import { WorkExperience } from '../../domain/models/WorkExperience';
 import { Resume } from '../../domain/models/Resume';
 import { Application } from '../../domain/models/Application';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export const addCandidate = async (candidateData: any) => {
     try {
@@ -12,7 +15,16 @@ export const addCandidate = async (candidateData: any) => {
         throw new Error(error);
     }
 
-    const candidate = new Candidate(candidateData); // Crear una instancia del modelo Candidate
+    // Extract only basic candidate data for the Candidate model
+    const basicCandidateData = {
+        firstName: candidateData.firstName,
+        lastName: candidateData.lastName,
+        email: candidateData.email,
+        phone: candidateData.phone,
+        address: candidateData.address
+    };
+    
+    const candidate = new Candidate(basicCandidateData); // Crear una instancia del modelo Candidate
     try {
         const savedCandidate = await candidate.save(); // Guardar el candidato en la base de datos
         const candidateId = savedCandidate.id; // Obtener el ID del candidato guardado
@@ -44,7 +56,14 @@ export const addCandidate = async (candidateData: any) => {
             await resumeModel.save();
             candidate.resumes.push(resumeModel);
         }
-        return savedCandidate;
+        
+        // Return the complete candidate data with nested records
+        return {
+            ...savedCandidate,
+            educations: candidate.educations,
+            workExperiences: candidate.workExperiences,
+            resumes: candidate.resumes
+        };
     } catch (error: any) {
         if (error.code === 'P2002') {
             // Unique constraint failed on the fields: (`email`)
@@ -78,7 +97,18 @@ export const updateCandidateStage = async (id: number, applicationIdNumber: numb
         // Guardar la aplicación actualizada
         await application.save();
 
-        return application;
+        // Get the complete application data with interviews
+        const completeApplication = await prisma.application.findUnique({
+            where: { id: applicationIdNumber },
+            include: {
+                interviews: true,
+                interviewStep: true,
+                position: true,
+                candidate: true
+            }
+        });
+
+        return completeApplication;
     } catch (error: any) {
         throw new Error(error);
     }

@@ -1,0 +1,127 @@
+{
+	"type": "object",
+	"required": ["partitions", "boundaries", "scenarios", "negatives", "oracle_rules", "assumptions"],
+	"properties": {
+		"partitions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid candidate ID that exists in database",
+				"Valid candidate ID with complete profile data",
+				"Valid candidate ID with education records",
+				"Valid candidate ID with work experience records",
+				"Valid candidate ID with CV information",
+				"Valid candidate ID with minimal profile data",
+				"Invalid candidate ID format (non-numeric)",
+				"Invalid candidate ID (negative number)",
+				"Invalid candidate ID (zero)",
+				"Valid candidate ID that does not exist in database",
+				"Valid candidate ID with null optional fields",
+				"Valid candidate ID with empty arrays for education/work experience"
+			]
+		},
+		"boundaries": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"ID parameter: must be positive integer",
+				"ID parameter: must be parseable from string",
+				"ID parameter: must exist in Candidate table",
+				"Response: must include all candidate fields",
+				"Response: must include education array (can be empty)",
+				"Response: must include work experience array (can be empty)",
+				"Response: must include CV object (can be null)",
+				"Response: must include all nested object properties",
+				"Database query: must use primary key lookup",
+				"Database query: must include related tables (Education, WorkExperience, Resume)",
+				"Error response: must include appropriate HTTP status code",
+				"Error response: must include descriptive error message"
+			]
+		},
+		"scenarios": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Retrieve candidate with ID 1 (exists in database)",
+				"Retrieve candidate with complete profile including all education records",
+				"Retrieve candidate with complete profile including all work experiences",
+				"Retrieve candidate with CV file information",
+				"Retrieve candidate with mixed education and work experience data",
+				"Retrieve candidate with no education records",
+				"Retrieve candidate with no work experience records",
+				"Retrieve candidate with no CV information",
+				"Retrieve candidate with null phone number",
+				"Retrieve candidate with null address",
+				"Retrieve candidate with ongoing education (no end date)",
+				"Retrieve candidate with current job (no end date)"
+			]
+		},
+		"negatives": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"ID parameter as string 'abc' (non-numeric)",
+				"ID parameter as string '12.5' (decimal number)",
+				"ID parameter as string '-1' (negative number)",
+				"ID parameter as string '0' (zero)",
+				"ID parameter as empty string ''",
+				"ID parameter as null",
+				"ID parameter as undefined",
+				"ID parameter as boolean true",
+				"ID parameter as boolean false",
+				"ID parameter as array [1]",
+				"ID parameter as object {id: 1}",
+				"ID parameter with special characters '1@'",
+				"ID parameter with spaces ' 1 '",
+				"ID parameter with leading zeros '001'",
+				"Valid ID format but candidate does not exist (ID 99999)",
+				"Valid ID format but candidate was deleted",
+				"Valid ID format but database connection fails",
+				"Valid ID format but related tables are corrupted"
+			]
+		},
+		"oracle_rules": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid ID returns 200 status with complete candidate data",
+				"Invalid ID format returns 400 status with 'Invalid ID format' error",
+				"Non-existent candidate returns 404 status with 'Candidate not found' error",
+				"Server error returns 500 status with 'Internal Server Error' error",
+				"Response includes all candidate fields (id, firstName, lastName, email, phone, address)",
+				"Response includes education array with all education records",
+				"Response includes work experience array with all work experience records",
+				"Response includes CV object with filePath and fileType",
+				"Database query uses efficient primary key lookup",
+				"Related data is properly joined and returned",
+				"Null fields are returned as null (not undefined)",
+				"Empty arrays are returned as empty arrays (not null)",
+				"Response format matches schema exactly",
+				"Error responses include only error field (not message field)",
+				"All string fields are properly encoded"
+			]
+		},
+		"assumptions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Database connection is available and working",
+				"Candidate table exists with proper indexes",
+				"Education, WorkExperience, and Resume tables exist",
+				"Foreign key relationships are properly configured",
+				"ID parameter is passed as string in URL path",
+				"ID parsing uses parseInt() function",
+				"Database queries use Prisma ORM",
+				"Response serialization handles null values correctly",
+				"HTTP status codes follow REST conventions",
+				"Error messages are user-friendly and descriptive",
+				"Database transactions are not required for read operations",
+				"Related data is eagerly loaded (not lazy loaded)",
+				"All candidate data is stored in UTF-8 encoding",
+				"File paths in CV data are accessible",
+				"Database performance is acceptable for single record lookups"
+			]
+		}
+	},
+	"additionalProperties": false
+}

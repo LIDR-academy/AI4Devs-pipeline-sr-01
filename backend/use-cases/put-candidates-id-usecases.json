@@ -1,0 +1,133 @@
+{
+	"type": "object",
+	"required": ["partitions", "boundaries", "scenarios", "negatives", "oracle_rules", "assumptions"],
+	"properties": {
+		"partitions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid candidate ID with valid application ID and interview step",
+				"Valid candidate ID with valid application ID but invalid interview step",
+				"Valid candidate ID with invalid application ID",
+				"Invalid candidate ID format with valid request body",
+				"Valid candidate ID with non-existent application",
+				"Valid candidate ID with application belonging to different candidate",
+				"Valid candidate ID with application that has no interviews",
+				"Valid candidate ID with application that has completed interviews",
+				"Valid candidate ID with application in initial stage",
+				"Valid candidate ID with application in final stage",
+				"Valid candidate ID with application in middle stage",
+				"Valid candidate ID with application that has notes"
+			]
+		},
+		"boundaries": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"candidate ID: must be positive integer",
+				"applicationId: must be positive integer",
+				"currentInterviewStep: must be positive integer",
+				"Application must exist in database",
+				"Application must belong to specified candidate",
+				"Interview step must exist in InterviewStep table",
+				"Interview step must belong to position's interview flow",
+				"Response must include updated application data",
+				"Response must include all interview records",
+				"Response must include success message",
+				"Database update must be atomic",
+				"Error response must include appropriate HTTP status"
+			]
+		},
+		"scenarios": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Update candidate stage from initial screening to technical interview",
+				"Update candidate stage from technical interview to manager interview",
+				"Update candidate stage from manager interview to final decision",
+				"Update candidate stage for application with existing interview history",
+				"Update candidate stage for application with no previous interviews",
+				"Update candidate stage for application with multiple completed interviews",
+				"Update candidate stage for application with notes",
+				"Update candidate stage for application without notes",
+				"Update candidate stage to same current step (no change)",
+				"Update candidate stage to previous step (regression)",
+				"Update candidate stage to future step (advancement)",
+				"Update candidate stage for application with high interview scores"
+			]
+		},
+		"negatives": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Missing applicationId in request body",
+				"Missing currentInterviewStep in request body",
+				"applicationId as string 'abc' (non-numeric)",
+				"currentInterviewStep as string 'xyz' (non-numeric)",
+				"applicationId as negative number -1",
+				"currentInterviewStep as negative number -1",
+				"applicationId as zero 0",
+				"currentInterviewStep as zero 0",
+				"applicationId as decimal 1.5",
+				"currentInterviewStep as decimal 2.5",
+				"applicationId as boolean true",
+				"currentInterviewStep as boolean false",
+				"applicationId as null",
+				"currentInterviewStep as null",
+				"applicationId as undefined",
+				"currentInterviewStep as undefined",
+				"Valid format but application does not exist",
+				"Valid format but application belongs to different candidate",
+				"Valid format but interview step does not exist",
+				"Valid format but interview step not in position's flow",
+				"Invalid JSON structure in request body",
+				"Extra unexpected fields in request body",
+				"Empty request body",
+				"Request body as string instead of JSON"
+			]
+		},
+		"oracle_rules": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Valid request returns 200 status with success message and updated data",
+				"Invalid candidate ID format returns 400 status with 'Invalid position ID format' error",
+				"Invalid interview step format returns 400 status with 'Invalid currentInterviewStep format' error",
+				"Non-existent application returns 404 status with 'Application not found' error",
+				"Server error returns 500 status with 'Unknown error' error",
+				"Response includes success message 'Candidate stage updated successfully'",
+				"Response includes complete application data with updated currentInterviewStep",
+				"Response includes all interview records for the application",
+				"Database update modifies only the currentInterviewStep field",
+				"Database transaction is atomic (all or nothing)",
+				"Application lookup uses both candidate ID and application ID",
+				"Interview step validation occurs before database update",
+				"Response format matches schema exactly",
+				"Error responses include both message and error fields",
+				"All integer fields are properly validated"
+			]
+		},
+		"assumptions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Database connection is available and working",
+				"Application table exists with proper indexes",
+				"InterviewStep table exists with proper relationships",
+				"Foreign key relationships are properly configured",
+				"Application lookup uses composite key (candidateId + applicationId)",
+				"Interview step validation checks against position's interview flow",
+				"Database updates use Prisma ORM",
+				"Response serialization handles nested objects correctly",
+				"HTTP status codes follow REST conventions",
+				"Error messages are descriptive and helpful",
+				"Database transactions ensure data consistency",
+				"Application and InterviewStep tables are properly joined",
+				"Interview records are properly associated with applications",
+				"All integer validations use parseInt() function",
+				"Request body parsing handles JSON correctly"
+			]
+		}
+	},
+	"additionalProperties": false
+}

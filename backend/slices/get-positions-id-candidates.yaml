@@ -1,0 +1,53 @@
+get:
+  summary: Get candidates by position
+  description: Retrieves all candidates for a specific position with their interview progress and scores.
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+      description: ID of the position
+  responses:
+    '200':
+      description: List of candidates retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                  description: Full name of the candidate
+                  example: "John Doe"
+                currentInterviewStep:
+                  type: string
+                  description: Current interview step name
+                  example: "Technical Interview"
+                candidateId:
+                  type: integer
+                  description: Candidate ID
+                  example: 1
+                applicationId:
+                  type: integer
+                  description: Application ID
+                  example: 1
+                averageScore:
+                  type: number
+                  description: Average score from interviews
+                  example: 4.5
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Error retrieving candidates"
+              error:
+                type: string
+                example: "Error retrieving candidates by position"

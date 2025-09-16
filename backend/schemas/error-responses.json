@@ -1,0 +1,67 @@
+{
+	"definitions": {
+		"errorResponse": {
+			"type": "object",
+			"required": ["error"],
+			"properties": {
+				"error": {
+					"type": "string"
+				}
+			},
+			"additionalProperties": false
+		},
+		"messageErrorResponse": {
+			"type": "object",
+			"required": ["message", "error"],
+			"properties": {
+				"message": {
+					"type": "string"
+				},
+				"error": {
+					"type": "string"
+				}
+			},
+			"additionalProperties": false
+		},
+		"validationErrorResponse": {
+			"type": "object",
+			"required": ["message", "error"],
+			"properties": {
+				"message": {
+					"type": "string",
+					"enum": ["Error adding candidate", "Error updating candidate stage", "Error retrieving positions", "Error retrieving candidates", "Server error"]
+				},
+				"error": {
+					"type": "string"
+				}
+			},
+			"additionalProperties": false
+		}
+	},
+	"schemas": {
+		"400BadRequest": {
+			"$ref": "#/definitions/messageErrorResponse"
+		},
+		"404NotFound": {
+			"$ref": "#/definitions/messageErrorResponse"
+		},
+		"500InternalServerError": {
+			"$ref": "#/definitions/messageErrorResponse"
+		},
+		"400InvalidIdFormat": {
+			"$ref": "#/definitions/errorResponse"
+		},
+		"404CandidateNotFound": {
+			"$ref": "#/definitions/errorResponse"
+		},
+		"500ServerError": {
+			"$ref": "#/definitions/errorResponse"
+		},
+		"400InvalidFileType": {
+			"$ref": "#/definitions/errorResponse"
+		},
+		"500UploadError": {
+			"$ref": "#/definitions/errorResponse"
+		}
+	}
+}

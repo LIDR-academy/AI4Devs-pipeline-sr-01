@@ -1,0 +1,124 @@
+{
+	"type": "object",
+	"required": ["partitions", "boundaries", "scenarios", "negatives", "oracle_rules", "assumptions"],
+	"properties": {
+		"partitions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Database with multiple visible positions",
+				"Database with single visible position",
+				"Database with no visible positions",
+				"Database with mixed visible and hidden positions",
+				"Database with positions having complete data",
+				"Database with positions having minimal data",
+				"Database with positions having null optional fields",
+				"Database with positions having different statuses",
+				"Database with positions having different employment types",
+				"Database with positions having salary ranges",
+				"Database with positions having application deadlines",
+				"Database with positions having different companies"
+			]
+		},
+		"boundaries": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Query filter: isVisible = true",
+				"Response: array of position objects",
+				"Response: each position includes all required fields",
+				"Response: each position includes optional fields (can be null)",
+				"Response: salary fields are numbers (can be null)",
+				"Response: date fields are ISO format strings",
+				"Response: boolean fields are true/false",
+				"Response: integer fields are positive numbers",
+				"Response: string fields are non-empty strings",
+				"Database query: uses WHERE clause for visibility filter",
+				"Database query: returns all columns from Position table",
+				"Error response: includes appropriate HTTP status code"
+			]
+		},
+		"scenarios": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Retrieve all visible positions from populated database",
+				"Retrieve positions with complete salary information",
+				"Retrieve positions with application deadlines",
+				"Retrieve positions with different employment types (Full-time, Part-time, Contract)",
+				"Retrieve positions with different statuses (Open, Closed, Draft)",
+				"Retrieve positions with benefits information",
+				"Retrieve positions with requirements and responsibilities",
+				"Retrieve positions with company descriptions",
+				"Retrieve positions with contact information",
+				"Retrieve positions with different locations",
+				"Retrieve positions from different companies",
+				"Retrieve positions with different interview flows"
+			]
+		},
+		"negatives": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Database connection failure",
+				"Position table does not exist",
+				"Position table is corrupted",
+				"Database query timeout",
+				"Memory insufficient for large result set",
+				"Database transaction deadlock",
+				"Position table has invalid data types",
+				"Position table has constraint violations",
+				"Database server is down",
+				"Network connectivity issues",
+				"Database permissions insufficient",
+				"Position table has foreign key constraint violations",
+				"Database query syntax error",
+				"Database connection pool exhausted",
+				"Position table has data corruption"
+			]
+		},
+		"oracle_rules": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Successful query returns 200 status with array of positions",
+				"Empty result set returns 200 status with empty array",
+				"Server error returns 500 status with error message",
+				"Response includes only positions where isVisible = true",
+				"Response includes all required fields for each position",
+				"Response includes optional fields (can be null)",
+				"Response format matches schema exactly",
+				"Array is properly formatted JSON",
+				"All position objects have consistent structure",
+				"String fields are properly encoded",
+				"Numeric fields are properly formatted",
+				"Date fields are in ISO format",
+				"Boolean fields are true/false (not strings)",
+				"Error responses include message and error fields",
+				"Database query is efficient and uses proper indexes"
+			]
+		},
+		"assumptions": {
+			"type": "array",
+			"items": { "type": "string" },
+			"value": [
+				"Database connection is available and working",
+				"Position table exists with proper structure",
+				"isVisible column exists and is boolean type",
+				"All required columns exist in Position table",
+				"Database query uses Prisma ORM",
+				"Response serialization handles null values correctly",
+				"HTTP status codes follow REST conventions",
+				"Error messages are descriptive and helpful",
+				"Database performance is acceptable for table scan",
+				"Memory is sufficient for result set",
+				"Network connectivity is stable",
+				"Database indexes are properly configured",
+				"All data types are correctly defined",
+				"Foreign key relationships are valid",
+				"Database transaction isolation is appropriate"
+			]
+		}
+	},
+	"additionalProperties": false
+}

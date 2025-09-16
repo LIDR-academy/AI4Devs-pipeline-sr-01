@@ -39,7 +39,11 @@ export const getInterviewFlowByPositionService = async (positionId: number) => {
         include: {
             interviewFlow: {
                 include: {
-                    interviewSteps: true
+                    interviewSteps: {
+                        orderBy: {
+                            orderIndex: 'asc'
+                        }
+                    }
                 }
             }
         }

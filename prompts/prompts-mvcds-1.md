@@ -1,0 +1,1 @@
+As a senior QA engineer, look at the routes available in @index.ts , and follow them recursevelly to understand how valid is @api-spec.yaml
