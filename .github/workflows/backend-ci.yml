@@ -96,16 +96,8 @@ jobs:
     - name: Setup SSH key
       run: |
         mkdir -p ~/.ssh
-        printf '%s\n' "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        
-        # Validate SSH key format
-        if ! ssh-keygen -l -f ~/.ssh/id_rsa >/dev/null 2>&1; then
-          echo " Invalid SSH key format"
-          exit 1
-        fi
-        
-        # Add host to known_hosts
         ssh-keyscan -H ${{ secrets.EC2_INSTANCE }} >> ~/.ssh/known_hosts
 
     - name: Create deployment package
