@@ -15,9 +15,9 @@ jobs:
       postgres:
         image: postgres:13
         env:
-          POSTGRES_PASSWORD: password
-          POSTGRES_USER: postgres
-          POSTGRES_DB: mydatabase
+          POSTGRES_PASSWORD: D1ymf8wyQEGthFR1E9xhCq
+          POSTGRES_USER: LTIdbUser
+          POSTGRES_DB: LTIdb
         ports:
           - 5432:5432
         # Set health checks to wait until postgres has started
@@ -38,6 +38,16 @@ jobs:
         cache: 'npm'
         cache-dependency-path: backend/package-lock.json
 
+    - name: Load environment variables
+      working-directory: ./backend
+      run: |
+        # Export variables from .env file to GitHub Actions environment
+        export $(grep -v '^#' .env | xargs)
+        echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_ENV
+        echo "DB_USER=$DB_USER" >> $GITHUB_ENV
+        echo "DB_NAME=$DB_NAME" >> $GITHUB_ENV
+        echo "DB_PORT=$DB_PORT" >> $GITHUB_ENV
+
     - name: Install backend dependencies
       working-directory: ./backend
       run: npm ci
@@ -50,13 +60,13 @@ jobs:
       working-directory: ./backend
       run: npx prisma migrate deploy
       env:
-        DATABASE_URL: postgresql://postgres:password@localhost:5432/mydatabase
+        DATABASE_URL: postgresql://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:${{ env.DB_PORT }}/${{ env.DB_NAME }}
 
     - name: Run backend tests
       working-directory: ./backend
       run: npm test
       env:
-        DATABASE_URL: postgresql://postgres:password@localhost:5432/mydatabase
+        DATABASE_URL: postgresql://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:${{ env.DB_PORT }}/${{ env.DB_NAME }}
 
     - name: Build backend
       working-directory: ./backend
