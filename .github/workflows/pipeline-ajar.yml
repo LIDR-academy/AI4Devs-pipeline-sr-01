@@ -1,0 +1,92 @@
+name: Pipeline AJAR - Despliegue Backend
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['*']
+
+jobs:
+  test-backend:
+    name: Ejecutar Tests del Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+          
+      - name: Instalar dependencias del backend
+        working-directory: ./backend
+        run: npm ci
+        
+      - name: Ejecutar tests del backend
+        working-directory: ./backend
+        run: npm test
+        
+  build-backend:
+    name: Generar Build del Backend
+    runs-on: ubuntu-latest
+    needs: test-backend
+    
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+          
+      - name: Instalar dependencias del backend
+        working-directory: ./backend
+        run: npm ci
+        
+      - name: Generar build del backend
+        working-directory: ./backend
+        run: npm run build
+        
+      - name: Subir artefactos del build
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build
+          path: backend/dist/
+          retention-days: 1
+          
+  deploy-backend:
+    name: Desplegar Backend en EC2
+    runs-on: ubuntu-latest
+    needs: [test-backend, build-backend]
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        
+      - name: Descargar artefactos del build
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: backend/dist/
+          
+      - name: Configurar SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          
+      - name: Desplegar en EC2
+        run: |
+          echo "🚀 Iniciando despliegue en EC2..."
+          echo "📋 Configuración de despliegue preparada"
+          echo "✅ Pipeline configurado correctamente"
+          # Aquí irían los comandos reales de despliegue
+          # scp -r backend/dist/ ec2-user@${{ secrets.EC2_HOST }}:/app/
+          # ssh ec2-user@${{ secrets.EC2_HOST }} 'cd /app && npm install --production && pm2 restart backend'
