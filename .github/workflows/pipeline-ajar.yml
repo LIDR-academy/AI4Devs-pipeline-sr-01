@@ -117,7 +117,7 @@ jobs:
           # Ejecutar comandos en EC2
           echo "🔧 Configurando aplicación en EC2..."
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_INSTANCE }} << 'EOF'
-            cd /app
+            cd app
             
             # Instalar dependencias de producción
             npm ci --production
