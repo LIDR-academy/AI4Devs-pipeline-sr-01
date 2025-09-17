@@ -15,7 +15,7 @@ jobs:
       postgres:
         image: postgres:13
         env:
-          POSTGRES_PASSWORD: D1ymf8wyQEGthFR1E9xhCq
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
           POSTGRES_USER: LTIdbUser
           POSTGRES_DB: LTIdb
         ports:
