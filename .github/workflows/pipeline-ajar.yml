@@ -1,0 +1,144 @@
+name: Pipeline AJAR - Despliegue Backend
+
+on:
+  pull_request:
+    branches: ['*']
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+jobs:
+  test-backend:
+    name: Ejecutar Tests del Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+          
+      - name: Instalar dependencias del backend
+        working-directory: ./backend
+        run: npm ci
+        
+      - name: Ejecutar tests del backend
+        working-directory: ./backend
+        run: npm test
+        
+  build-backend:
+    name: Generar Build del Backend
+    runs-on: ubuntu-latest
+    needs: test-backend
+    
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+          
+      - name: Instalar dependencias del backend
+        working-directory: ./backend
+        run: npm ci
+        
+      - name: Generar build del backend
+        working-directory: ./backend
+        run: npm run build
+        
+      - name: Subir artefactos del build
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build
+          path: backend/dist/
+          retention-days: 1
+          
+  deploy-backend:
+    name: Desplegar Backend en EC2
+    runs-on: ubuntu-latest
+    needs: [test-backend, build-backend]
+    
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        
+      - name: Descargar artefactos del build
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: backend/dist/
+          
+      - name: Configurar SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          
+      - name: Desplegar en EC2
+        run: |
+          echo "🚀 Iniciando despliegue en EC2..."
+          
+          # Crear directorio temporal para el despliegue
+          mkdir -p deploy-package
+          
+          # Copiar archivos necesarios para el despliegue
+          cp -r backend/dist/ deploy-package/
+          cp backend/package.json deploy-package/
+          cp backend/package-lock.json deploy-package/
+          cp -r backend/prisma/ deploy-package/
+          
+          # Crear script de inicio para producción
+          cat > deploy-package/start.sh << 'EOF'
+          #!/bin/bash
+          echo "🔧 Instalando dependencias de producción..."
+          npm ci --production
+          
+          echo "🗄️ Generando cliente de Prisma..."
+          npx prisma generate
+          
+          echo "🚀 Iniciando aplicación..."
+          npm start
+          EOF
+          
+          chmod +x deploy-package/start.sh
+          
+          # Subir archivos a EC2
+          echo "📤 Subiendo archivos a EC2..."
+          scp -o StrictHostKeyChecking=no -r deploy-package/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_INSTANCE }}:app/
+          
+          # Ejecutar comandos en EC2
+          echo "🔧 Configurando aplicación en EC2..."
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_INSTANCE }} << 'EOF'
+            cd app
+            
+            # Instalar dependencias de producción
+            npm ci --production
+            
+            # Generar cliente de Prisma
+            npx prisma generate
+            
+            # Configurar variables de entorno si es necesario
+            if [ ! -f .env ]; then
+              echo "⚠️ Archivo .env no encontrado. Asegúrate de configurar las variables de entorno."
+            fi
+            
+            # Reiniciar la aplicación (asumiendo que usas PM2)
+            if command -v pm2 &> /dev/null; then
+              pm2 restart backend || pm2 start dist/index.js --name backend
+            else
+              echo "⚠️ PM2 no está instalado. Iniciando aplicación directamente..."
+              pkill -f "node dist/index.js" || true
+              nohup npm start > app.log 2>&1 &
+            fi
+            
+            echo "✅ Aplicación desplegada correctamente"
+          EOF
+          
+          echo "🎉 Despliegue completado exitosamente"
