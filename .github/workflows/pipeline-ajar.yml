@@ -112,7 +112,7 @@ jobs:
           
           # Subir archivos a EC2
           echo "📤 Subiendo archivos a EC2..."
-          scp -o StrictHostKeyChecking=no -r deploy-package/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_ }}:/app/
+          scp -o StrictHostKeyChecking=no -r deploy-package/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_INSTANCE }}:/app/
           
           # Ejecutar comandos en EC2
           echo "🔧 Configurando aplicación en EC2..."
