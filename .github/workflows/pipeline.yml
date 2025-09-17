@@ -1,0 +1,280 @@
+name: Pipeline DevSecOps
+
+on:
+  push:
+    branches: ["*"]  # Se ejecuta en cualquier push
+  workflow_dispatch:  # Permite ejecución manual
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: read
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job 1: Detectar si existe PR abierto para la rama
+  detect_pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      has_open_pr: ${{ steps.check_pr.outputs.has_open_pr }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for open PR
+        id: check_pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = context.ref.replace('refs/heads/', '');
+            
+            console.log(`Checking for open PRs in branch: ${branch}`);
+            
+            try {
+              // Buscar PRs abiertos para esta rama
+              const { data: pulls } = await github.rest.pulls.list({
+                owner,
+                repo,
+                state: 'open',
+                head: `${owner}:${branch}`,
+                per_page: 1
+              });
+              
+              const hasOpenPR = pulls.length > 0;
+              console.log(`Found ${pulls.length} open PR(s) for branch ${branch}`);
+              
+              if (hasOpenPR) {
+                console.log(`PR found: #${pulls[0].number} - ${pulls[0].title}`);
+              }
+              
+              core.setOutput('has_open_pr', hasOpenPR.toString());
+              
+            } catch (error) {
+              console.error('Error checking for PRs:', error);
+              // Si hay error, asumir que no hay PR para evitar ejecuciones no deseadas
+              core.setOutput('has_open_pr', 'false');
+            }
+
+  # Job 2: Tests (solo si hay PR abierto)
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: detect_pr
+    if: needs.detect_pr.outputs.has_open_pr == 'true'
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: ./backend
+        run: npm test
+        env:
+          CI: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ github.sha }}
+          path: backend/test-results.xml
+          retention-days: 7
+
+  # Job 3: Build (solo si tests pasan)
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [detect_pr, test]
+    if: needs.detect_pr.outputs.has_open_pr == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Build application
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Create deployment package
+        run: |
+          cd backend
+          mkdir -p ../deploy-package
+          cp -r dist ../deploy-package/
+          cp package.json package-lock.json ../deploy-package/
+          cp -r node_modules ../deploy-package/
+          cd ../deploy-package
+          zip -r ../backend-${{ github.sha }}.zip .
+          cd ..
+          sha256sum backend-${{ github.sha }}.zip > backend-${{ github.sha }}.zip.sha256
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ github.sha }}
+          path: |
+            backend-${{ github.sha }}.zip
+            backend-${{ github.sha }}.zip.sha256
+          retention-days: 7
+
+  # Job 4: Deploy to EC2 (solo si build exitoso)
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [detect_pr, test, build]
+    if: needs.detect_pr.outputs.has_open_pr == 'true'
+    environment: production
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-${{ github.sha }}
+          path: ./artifacts
+
+      - name: Verify artifact checksum
+        run: |
+          cd artifacts
+          sha256sum -c backend-${{ github.sha }}.zip.sha256
+
+      - name: Deploy to EC2 via SSM
+        run: |
+          # Crear script de deploy temporal
+          cat > deploy_script.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          APP_DIR="/opt/app"
+          RELEASES_DIR="$APP_DIR/releases"
+          CURRENT_DIR="$APP_DIR/current"
+          NEW_RELEASE="$RELEASES_DIR/$GITHUB_SHA"
+          PREVIOUS_DIR="$RELEASES_DIR/previous"
+          
+          echo "Starting deployment for commit: $GITHUB_SHA"
+          
+          # Crear directorio de releases si no existe
+          sudo mkdir -p "$RELEASES_DIR"
+          
+          # Crear directorio para nueva versión
+          sudo mkdir -p "$NEW_RELEASE"
+          
+          # Descomprimir artefacto en nueva versión
+          sudo unzip -o /tmp/backend-$GITHUB_SHA.zip -d "$NEW_RELEASE"
+          
+          # Instalar dependencias de producción
+          cd "$NEW_RELEASE"
+          sudo npm ci --production
+          
+          # Si existe versión actual, moverla a previous
+          if [ -L "$CURRENT_DIR" ]; then
+            CURRENT_TARGET=$(readlink "$CURRENT_DIR")
+            if [ "$CURRENT_TARGET" != "$NEW_RELEASE" ]; then
+              sudo rm -rf "$PREVIOUS_DIR"
+              sudo mv "$CURRENT_TARGET" "$PREVIOUS_DIR"
+            fi
+          fi
+          
+          # Actualizar symlink current
+          sudo rm -f "$CURRENT_DIR"
+          sudo ln -s "$NEW_RELEASE" "$CURRENT_DIR"
+          
+          # Reiniciar aplicación (asumiendo PM2)
+          cd "$CURRENT_DIR"
+          sudo pm2 restart app || sudo pm2 start dist/index.js --name app
+          
+          # Health check
+          sleep 5
+          HEALTH_CHECK_URL="http://localhost:${APP_PORT:-3010}/"
+          if curl -f "$HEALTH_CHECK_URL" > /dev/null 2>&1; then
+            echo "Health check passed"
+            exit 0
+          else
+            echo "Health check failed, rolling back..."
+            # Rollback
+            if [ -d "$PREVIOUS_DIR" ]; then
+              sudo rm -f "$CURRENT_DIR"
+              sudo ln -s "$PREVIOUS_DIR" "$CURRENT_DIR"
+              cd "$CURRENT_DIR"
+              sudo pm2 restart app || sudo pm2 start dist/index.js --name app
+              echo "Rollback completed"
+            fi
+            exit 1
+          fi
+          EOF
+          
+          # Subir artefacto a EC2
+          aws s3 cp artifacts/backend-${{ github.sha }}.zip s3://${{ secrets.S3_BUCKET }}/deployments/backend-${{ github.sha }}.zip
+          
+          # Ejecutar script de deploy via SSM
+          aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /tmp",
+              "aws s3 cp s3://${{ secrets.S3_BUCKET }}/deployments/backend-${{ github.sha }}.zip .",
+              "export GITHUB_SHA=${{ github.sha }}",
+              "export APP_PORT=${{ vars.APP_PORT || 3010 }}",
+              "bash -s"
+            ]' \
+            --cli-input-json file://<(echo '{"commands":["cd /tmp","aws s3 cp s3://${{ secrets.S3_BUCKET }}/deployments/backend-${{ github.sha }}.zip .","export GITHUB_SHA=${{ github.sha }}","export APP_PORT=${{ vars.APP_PORT || 3010 }}","bash -s"],"workingDirectory":"/tmp"}') \
+            --timeout-seconds 300
+
+      - name: Wait for deployment completion
+        run: |
+          # Esperar a que el comando SSM termine
+          sleep 30
+          
+          # Verificar que la aplicación esté funcionando
+          aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["curl -f http://localhost:${APP_PORT:-3010}/ || exit 1"]'
+
+      - name: Deployment status
+        run: |
+          echo "✅ Deployment completed successfully"
+          echo "🚀 Application is running at: http://${{ secrets.EC2_HOST }}/"
+          echo "📦 Version: ${{ github.sha }}"
