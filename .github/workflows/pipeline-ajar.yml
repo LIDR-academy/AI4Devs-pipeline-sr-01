@@ -85,8 +85,61 @@ jobs:
       - name: Desplegar en EC2
         run: |
           echo "🚀 Iniciando despliegue en EC2..."
-          echo "📋 Configuración de despliegue preparada"
-          echo "✅ Pipeline configurado correctamente"
-          # Aquí irían los comandos reales de despliegue
-          # scp -r backend/dist/ ec2-user@${{ secrets.EC2_HOST }}:/app/
-          # ssh ec2-user@${{ secrets.EC2_HOST }} 'cd /app && npm install --production && pm2 restart backend'
+          
+          # Crear directorio temporal para el despliegue
+          mkdir -p deploy-package
+          
+          # Copiar archivos necesarios para el despliegue
+          cp -r backend/dist/ deploy-package/
+          cp backend/package.json deploy-package/
+          cp backend/package-lock.json deploy-package/
+          cp -r backend/prisma/ deploy-package/
+          
+          # Crear script de inicio para producción
+          cat > deploy-package/start.sh << 'EOF'
+          #!/bin/bash
+          echo "🔧 Instalando dependencias de producción..."
+          npm ci --production
+          
+          echo "🗄️ Generando cliente de Prisma..."
+          npx prisma generate
+          
+          echo "🚀 Iniciando aplicación..."
+          npm start
+          EOF
+          
+          chmod +x deploy-package/start.sh
+          
+          # Subir archivos a EC2
+          echo "📤 Subiendo archivos a EC2..."
+          scp -o StrictHostKeyChecking=no -r deploy-package/* ec2-user@${{ secrets.EC2_INSTANCE }}:/app/
+          
+          # Ejecutar comandos en EC2
+          echo "🔧 Configurando aplicación en EC2..."
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_INSTANCE }} << 'EOF'
+            cd /app
+            
+            # Instalar dependencias de producción
+            npm ci --production
+            
+            # Generar cliente de Prisma
+            npx prisma generate
+            
+            # Configurar variables de entorno si es necesario
+            if [ ! -f .env ]; then
+              echo "⚠️ Archivo .env no encontrado. Asegúrate de configurar las variables de entorno."
+            fi
+            
+            # Reiniciar la aplicación (asumiendo que usas PM2)
+            if command -v pm2 &> /dev/null; then
+              pm2 restart backend || pm2 start dist/index.js --name backend
+            else
+              echo "⚠️ PM2 no está instalado. Iniciando aplicación directamente..."
+              pkill -f "node dist/index.js" || true
+              nohup npm start > app.log 2>&1 &
+            fi
+            
+            echo "✅ Aplicación desplegada correctamente"
+          EOF
+          
+          echo "🎉 Despliegue completado exitosamente"
