@@ -1,0 +1,186 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-test-and-build:
+    runs-on: ubuntu-latest
+    
+    # Set up PostgreSQL service for tests
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_USER: LTIdbUser
+          POSTGRES_DB: LTIdb
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+
+    - name: Load environment variables
+      working-directory: ./backend
+      run: |
+        # Export variables from .env file to GitHub Actions environment
+        export $(grep -v '^#' .env | xargs)
+        echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_ENV
+        echo "DB_USER=$DB_USER" >> $GITHUB_ENV
+        echo "DB_NAME=$DB_NAME" >> $GITHUB_ENV
+        echo "DB_PORT=$DB_PORT" >> $GITHUB_ENV
+
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    - name: Generate Prisma client
+      working-directory: ./backend
+      run: npx prisma generate
+
+    - name: Run database migrations
+      working-directory: ./backend
+      run: npx prisma migrate deploy
+      env:
+        DATABASE_URL: postgresql://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:${{ env.DB_PORT }}/${{ env.DB_NAME }}
+
+    - name: Run backend tests
+      working-directory: ./backend
+      run: npm test
+      env:
+        DATABASE_URL: postgresql://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:${{ env.DB_PORT }}/${{ env.DB_NAME }}
+
+    - name: Build backend
+      working-directory: ./backend
+      run: npm run build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-build
+        path: backend/dist/
+
+  deploy-to-ec2:
+    needs: backend-test-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: backend-build
+        path: backend/dist/
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-region: 'eu-north-1'
+
+    - name: Create deployment package
+      run: |
+        # Create a deployment directory with all necessary files
+        mkdir -p deployment
+        
+        # Copy backend files
+        cp -r backend/dist deployment/
+        cp backend/package.json deployment/
+        cp backend/package-lock.json deployment/
+        cp -r backend/prisma deployment/
+        cp backend/.env deployment/
+        
+        # Create deployment script
+        cat > deployment/deploy.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        # Navigate to app directory
+        cd /home/ec2-user/lti-backend
+        
+        # Stop existing application
+        pm2 stop lti-backend || true
+        
+        # Install/update dependencies (production only)
+        npm ci --only=production
+        
+        # Generate Prisma client
+        npx prisma generate
+        
+        # Run database migrations
+        npx prisma migrate deploy
+        
+        # Start application with PM2
+        pm2 start dist/index.js --name lti-backend --update-env
+        
+        # Save PM2 configuration
+        pm2 save
+        
+        # Show status
+        pm2 status
+        EOF
+        
+        chmod +x deployment/deploy.sh
+
+    - name: Deploy to EC2
+      env:
+        PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.EC2_INSTANCE }}
+        USER: ec2-user
+      run: |
+        # Create private key file
+        echo "$PRIVATE_KEY" > private_key.pem
+        chmod 600 private_key.pem
+        
+        # Create app directory on EC2 if it doesn't exist
+        ssh -i private_key.pem -o StrictHostKeyChecking=no $USER@$HOST "mkdir -p /home/ec2-user/lti-backend"
+        
+        # Copy files to EC2
+        scp -i private_key.pem -o StrictHostKeyChecking=no -r deployment/* $USER@$HOST:/home/ec2-user/lti-backend/
+        
+        # Execute deployment script on EC2
+        ssh -i private_key.pem -o StrictHostKeyChecking=no $USER@$HOST "cd /home/ec2-user/lti-backend && ./deploy.sh"
+
+    - name: Health check
+      env:
+        PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.EC2_INSTANCE }}
+        USER: ec2-user
+      run: |
+        # Create private key file
+        echo "$PRIVATE_KEY" > private_key.pem
+        chmod 600 private_key.pem
+        
+        # Wait a moment for the application to start
+        sleep 10
+        
+        # Check if the application is responding
+        ssh -i private_key.pem -o StrictHostKeyChecking=no $USER@$HOST "curl -f http://localhost:3010/health || exit 1"
+      continue-on-error: true
+
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -f private_key.pem

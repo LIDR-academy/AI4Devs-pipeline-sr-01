@@ -42,7 +42,7 @@ async function main() {
       requirements: '3+ years of experience in software development, knowledge in React and Node.js',
       responsibilities: 'Develop, test, and maintain software solutions.',
       companyDescription: 'LTI is a leading HR solutions provider.',
-      applicationDeadline: new Date('2024-12-31')
+      applicationDeadline: new Date('2024-12-31T00:00:00.000Z')
     },
   });
 
@@ -64,7 +64,7 @@ async function main() {
       requirements: 'Master degree in Data Science or related field, proficiency in Python and R',
       responsibilities: 'Analyze data sets to derive business insights and develop predictive models.',
       companyDescription: 'LTI is a leading HR solutions provider.',
-      applicationDeadline: new Date('2024-12-31')
+      applicationDeadline: new Date('2024-12-31T00:00:00.000Z')
     },
   });
 
@@ -81,8 +81,8 @@ async function main() {
           {
             institution: 'University A',
             title: 'BSc Computer Science',
-            startDate: new Date('2015-09-01'),
-            endDate: new Date('2019-06-01'),
+            startDate: new Date('2015-09-01T00:00:00.000Z'),
+            endDate: new Date('2019-06-01T00:00:00.000Z'),
           },
         ],
       },
@@ -92,8 +92,8 @@ async function main() {
             company: 'Eventbrite',
             position: 'Software Developer',
             description: 'Developed web applications',
-            startDate: new Date('2019-07-01'),
-            endDate: new Date('2021-08-01'),
+            startDate: new Date('2019-07-01T00:00:00.000Z'),
+            endDate: new Date('2021-08-01T00:00:00.000Z'),
           },
         ],
       },
@@ -121,8 +121,8 @@ async function main() {
           {
             institution: 'Maryland',
             title: 'MSc Data Science',
-            startDate: new Date('2016-09-01'),
-            endDate: new Date('2020-06-01'),
+            startDate: new Date('2016-09-01T00:00:00.000Z'),
+            endDate: new Date('2020-06-01T00:00:00.000Z'),
           },
         ],
       },
@@ -132,8 +132,8 @@ async function main() {
             company: 'Gitlab',
             position: 'Data Scientist',
             description: 'Analyzed data sets',
-            startDate: new Date('2020-07-01'),
-            endDate: new Date('2022-08-01'),
+            startDate: new Date('2020-07-01T00:00:00.000Z'),
+            endDate: new Date('2022-08-01T00:00:00.000Z'),
           },
         ],
       },
@@ -161,8 +161,8 @@ async function main() {
           {
             institution: 'Instituto Tecnológico',
             title: 'Ingeniería en Sistemas Computacionales',
-            startDate: new Date('2017-01-01'),
-            endDate: new Date('2021-12-01'),
+            startDate: new Date('2017-01-01T00:00:00.000Z'),
+            endDate: new Date('2021-12-01T00:00:00.000Z'),
           },
         ],
       },
@@ -172,8 +172,8 @@ async function main() {
             company: 'Innovaciones Tech',
             position: 'Ingeniero de Software',
             description: 'Desarrollo y mantenimiento de aplicaciones de software',
-            startDate: new Date('2022-01-01'),
-            endDate: new Date('2023-01-01'),
+            startDate: new Date('2022-01-01T00:00:00.000Z'),
+            endDate: new Date('2023-01-01T00:00:00.000Z'),
           },
         ],
       },
