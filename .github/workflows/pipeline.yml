@@ -215,17 +215,31 @@ jobs:
             echo "NODE_ENV=\"production\"" >> .env
             echo "PORT=\"3010\"" >> .env
             
-            # Generate Prisma client
+            # Show environment variables (without sensitive data)
+            echo "Environment variables configured:"
+            echo "NODE_ENV=$(grep NODE_ENV .env | cut -d'=' -f2)"
+            echo "PORT=$(grep PORT .env | cut -d'=' -f2)"
+            echo "DATABASE_URL is set (hidden for security)"
+            
+            # Generate Prisma client with environment variables
             echo "Generating Prisma client..."
             npx prisma generate
+            
+            # Test database connection first
+            echo "Testing database connection..."
+            npx prisma db pull --print || {
+              echo "❌ Database connection failed!"
+              echo "Please check:"
+              echo "1. DATABASE_URL secret is correct"
+              echo "2. PostgreSQL is running on EC2"
+              echo "3. Database and user exist"
+              echo "4. Firewall allows connections"
+              exit 1
+            }
             
             # Run migrations
             echo "Running database migrations..."
             npx prisma migrate deploy
-            
-            # Verify database connection
-            echo "Testing database connection..."
-            npx prisma db pull --print || echo "Database connection test completed"
             
             # Kill existing process if running
             echo "Stopping existing processes..."
