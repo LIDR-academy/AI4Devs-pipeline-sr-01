@@ -71,7 +71,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-dist
-          path: backend/dist/
+          path: |
+            backend/dist/
+            backend/prisma/
           retention-days: 1
 
   deploy-backend:
@@ -88,7 +90,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-dist
-          path: ./dist
+          path: ./artifacts
 
       - name: Setup SSH key
         run: |
@@ -122,7 +124,7 @@ jobs:
         run: |
           cd backend
           # Create minimal package.json for production
-          cat > ../dist/package.json << EOF
+          cat > ../artifacts/dist/package.json << EOF
           {
             "name": "backend",
             "version": "1.0.0",
@@ -145,7 +147,7 @@ jobs:
           # Copy package-lock.json if it exists for better dependency resolution
           if [ -f "package-lock.json" ]; then
             echo "Copying package-lock.json for better dependency resolution..."
-            cp package-lock.json ../dist/
+            cp package-lock.json ../artifacts/dist/
           else
             echo "No package-lock.json found, will use npm install"
           fi
@@ -157,8 +159,16 @@ jobs:
           # Copy files to EC2
           echo "Copying files to EC2..."
           rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30" \
-            ./dist/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/backend/ || {
-            echo "Failed to copy files to EC2"
+            ./artifacts/dist/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/backend/ || {
+            echo "Failed to copy dist files to EC2"
+            exit 1
+          }
+
+          # Copy prisma folder to EC2
+          echo "Copying Prisma schema and migrations..."
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30" \
+            ./artifacts/prisma/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/backend/prisma/ || {
+            echo "Failed to copy Prisma files to EC2"
             exit 1
           }
 
@@ -178,6 +188,16 @@ jobs:
               echo "Error: package.json not found"
               exit 1
             fi
+            
+            # Check if Prisma schema exists
+            if [ ! -f "prisma/schema.prisma" ]; then
+              echo "Error: Prisma schema not found at prisma/schema.prisma"
+              echo "Contents of prisma directory:"
+              ls -la prisma/ || echo "prisma directory does not exist"
+              exit 1
+            fi
+            
+            echo "✅ Prisma schema found at prisma/schema.prisma"
             
             # Install production dependencies
             echo "Installing production dependencies..."
