@@ -1,0 +1,190 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+env:
+  AWS_REGION: eu-north-1
+  NODE_VERSION: 20
+
+jobs:
+  test-backend:
+    name: Run Backend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Run tests
+        run: npm test
+
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    needs: test-backend
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: backend/dist/
+          retention-days: 1
+
+  deploy-backend:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build-backend
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-dist
+          path: ./dist
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create production package.json
+        run: |
+          cd backend
+          # Create minimal package.json for production
+          cat > ../dist/package.json << EOF
+          {
+            "name": "backend",
+            "version": "1.0.0",
+            "main": "index.js",
+            "scripts": {
+              "start": "node index.js"
+            },
+            "dependencies": {
+              "@prisma/client": "^5.13.0",
+              "cors": "^2.8.5",
+              "dotenv": "^16.4.5",
+              "express": "^4.19.2",
+              "multer": "^1.4.5-lts.1",
+              "swagger-jsdoc": "^6.2.8",
+              "swagger-ui-express": "^5.0.0"
+            }
+          }
+          EOF
+
+      - name: Deploy to EC2
+        run: |
+          # Copy files to EC2
+          rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" \
+            ./dist/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/backend/
+
+          # Install production dependencies and start the service
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd ~/backend
+            npm ci --omit=dev
+            npx prisma generate
+            npx prisma migrate deploy
+            # Kill existing process if running
+            pkill -f "node.*index.js" || true
+            # Start the application
+            nohup npm start > app.log 2>&1 &
+            echo "Backend deployed and started"
+          EOF
+
+  health-check:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    needs: deploy-backend
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Wait for service to start
+        run: sleep 10
+
+      - name: Health check
+        run: |
+          # Test the API endpoint
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}:3010/)
+          if [ "$response" = "200" ]; then
+            echo "✅ API is responding correctly (HTTP 200)"
+            # Test response content
+            content=$(curl -s http://${{ secrets.EC2_HOST }}:3010/)
+            if [[ "$content" == *"Hola LTI!"* ]]; then
+              echo "✅ API content is correct"
+            else
+              echo "❌ API content is incorrect: $content"
+              exit 1
+            fi
+          else
+            echo "❌ API is not responding correctly (HTTP $response)"
+            exit 1
+          fi
+
+      - name: Test API endpoints
+        run: |
+          # Test positions endpoint
+          positions_response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}:3010/positions/)
+          if [ "$positions_response" = "200" ]; then
+            echo "✅ Positions endpoint is working"
+          else
+            echo "❌ Positions endpoint failed (HTTP $positions_response)"
+            exit 1
+          fi
+
+          # Test candidates endpoint
+          candidates_response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}:3010/candidates/)
+          if [ "$candidates_response" = "200" ]; then
+            echo "✅ Candidates endpoint is working"
+          else
+            echo "❌ Candidates endpoint failed (HTTP $candidates_response)"
+            exit 1
+          fi
