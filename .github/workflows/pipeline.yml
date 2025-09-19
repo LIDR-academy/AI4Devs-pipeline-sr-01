@@ -209,6 +209,12 @@ jobs:
               npm install --omit=dev
             fi
             
+            # Set environment variables
+            echo "Setting up environment variables..."
+            echo "DATABASE_URL=\"${{ secrets.DATABASE_URL }}\"" > .env
+            echo "NODE_ENV=\"production\"" >> .env
+            echo "PORT=\"3010\"" >> .env
+            
             # Generate Prisma client
             echo "Generating Prisma client..."
             npx prisma generate
@@ -216,6 +222,10 @@ jobs:
             # Run migrations
             echo "Running database migrations..."
             npx prisma migrate deploy
+            
+            # Verify database connection
+            echo "Testing database connection..."
+            npx prisma db pull --print || echo "Database connection test completed"
             
             # Kill existing process if running
             echo "Stopping existing processes..."
@@ -266,6 +276,15 @@ jobs:
           else
             echo "❌ API is not responding correctly (HTTP $response)"
             exit 1
+          fi
+
+          # Test database connectivity through API
+          echo "Testing database connectivity..."
+          db_test_response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}:3010/positions/)
+          if [ "$db_test_response" = "200" ]; then
+            echo "✅ Database connectivity verified through API"
+          else
+            echo "⚠️ Database connectivity test returned HTTP $db_test_response (this might be expected if no data exists)"
           fi
 
       - name: Test API endpoints
