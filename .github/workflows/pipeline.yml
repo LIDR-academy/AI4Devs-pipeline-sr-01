@@ -95,7 +95,28 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+          # Test SSH connection and add host key
+          echo "Testing SSH connection to ${{ secrets.EC2_HOST }}..."
+          ssh-keyscan -H -p 22 ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts || {
+            echo "Failed to scan host key for ${{ secrets.EC2_HOST }}"
+            echo "Please check:"
+            echo "1. EC2_HOST secret is correct (IP or domain)"
+            echo "2. EC2 instance is running"
+            echo "3. Security group allows SSH on port 22"
+            echo "4. EC2 instance has public IP"
+            exit 1
+          }
+
+          # Test SSH connection
+          ssh -o ConnectTimeout=10 -o BatchMode=yes ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'" || {
+            echo "SSH connection failed"
+            echo "Please check:"
+            echo "1. EC2_SSH_KEY secret contains the correct private key"
+            echo "2. EC2_USER secret is correct (ec2-user, ubuntu, etc.)"
+            echo "3. SSH key is properly configured on EC2 instance"
+            exit 1
+          }
 
       - name: Create production package.json
         run: |
@@ -123,21 +144,65 @@ jobs:
 
       - name: Deploy to EC2
         run: |
+          echo "Starting deployment to EC2..."
+
           # Copy files to EC2
-          rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" \
-            ./dist/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/backend/
+          echo "Copying files to EC2..."
+          rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30" \
+            ./dist/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/backend/ || {
+            echo "Failed to copy files to EC2"
+            exit 1
+          }
 
           # Install production dependencies and start the service
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          echo "Installing dependencies and starting service..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            echo "Connected to EC2 instance"
+            
             cd ~/backend
+            echo "Current directory: $(pwd)"
+            echo "Files in directory:"
+            ls -la
+            
+            # Check if package.json exists
+            if [ ! -f "package.json" ]; then
+              echo "Error: package.json not found"
+              exit 1
+            fi
+            
+            # Install production dependencies
+            echo "Installing production dependencies..."
             npm ci --omit=dev
+            
+            # Generate Prisma client
+            echo "Generating Prisma client..."
             npx prisma generate
+            
+            # Run migrations
+            echo "Running database migrations..."
             npx prisma migrate deploy
+            
             # Kill existing process if running
+            echo "Stopping existing processes..."
             pkill -f "node.*index.js" || true
+            sleep 2
+            
             # Start the application
+            echo "Starting application..."
             nohup npm start > app.log 2>&1 &
-            echo "Backend deployed and started"
+            sleep 3
+            
+            # Check if process is running
+            if pgrep -f "node.*index.js" > /dev/null; then
+              echo "✅ Backend deployed and started successfully"
+              echo "Process ID: $(pgrep -f 'node.*index.js')"
+            else
+              echo "❌ Failed to start application"
+              echo "App log:"
+              cat app.log || echo "No log file found"
+              exit 1
+            fi
           EOF
 
   health-check:
